@@ -24,6 +24,9 @@ All notable changes to the AZOM plugin are documented here.
 
 - **Switching profiles or reconnecting sets the mBooster to the profile's role.**
 
+- **An mBooster output curve no longer keeps the previous profile's range.** Each profile's curve
+  and range are now saved and applied together.
+
 - **Multiple standalone mBooster pedals read from the correct axis.**
 
 - **Dashboard data on session 0x01 is acknowledged again.** When the wheel skipped the open ack, its

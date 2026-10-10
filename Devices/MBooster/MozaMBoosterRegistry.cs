@@ -793,6 +793,56 @@ namespace MozaPlugin.Devices.MBooster
             return true;
         }
 
+        /// <summary>
+        /// The output mapping a profile pins. Curve and range are one setting:
+        /// once any part is stored, unset parts are Linear / 0 / 100, not
+        /// whatever the previous profile left on the unit (bug report
+        /// 3RJGVGT5). False when the profile stores none of it.
+        /// </summary>
+        internal static bool TryOutputMapping(IMBoosterPedalConfig? cfg, out int min, out int max, out float[] curve)
+        {
+            min = 0;
+            max = 100;
+            curve = (float[])MBoosterUiConstants.LinearOutputCurve.Clone();
+            if (cfg == null) return false;
+            bool hasCurve = cfg.HardwareCurveY != null && cfg.HardwareCurveY.Length == 5;
+            if (!hasCurve && cfg.Min < 0 && cfg.Max < 0) return false;
+            if (cfg.Min >= 0) min = cfg.Min;
+            if (cfg.Max >= 0) max = cfg.Max;
+            if (hasCurve) curve = (float[])cfg.HardwareCurveY!.Clone();
+            return true;
+        }
+
+        /// <summary>
+        /// The output mapping the editor shows: the profile's own
+        /// (<see cref="TryOutputMapping"/>) when it has one, else what the
+        /// unit reports (<paramref name="reported"/>: "min", "max",
+        /// "y1".."y5" → value, -1 unknown), else Linear 0–100.
+        /// </summary>
+        internal static void ResolveOutputMapping(IMBoosterPedalConfig? cfg, Func<string, int> reported,
+            out int min, out int max, out float[] curve)
+        {
+            if (TryOutputMapping(cfg, out min, out max, out curve)) return;
+            int r = reported("min"); if (r >= 0) min = r;
+            r = reported("max"); if (r >= 0) max = r;
+            for (int i = 0; i < 5; i++)
+            {
+                r = reported($"y{i + 1}");
+                if (r >= 0) curve[i] = r;
+            }
+        }
+
+        /// <summary>Store the whole output mapping as shown
+        /// (<see cref="ResolveOutputMapping"/>) before a UI edit to one part
+        /// of it.</summary>
+        internal static void PinOutputMapping(IMBoosterPedalConfig cfg, Func<string, int> reported)
+        {
+            ResolveOutputMapping(cfg, reported, out int min, out int max, out float[] curve);
+            cfg.Min = min;
+            cfg.Max = max;
+            cfg.HardwareCurveY = curve;
+        }
+
         // Default/un-dragged shape of the Pedal Feel curve's 6 Y nodes
         // (mbooster-brake-feelcurve-1..6, cmdId 0xAB selectors 0x08-0x0D),
         // as a fraction (0-1) of the way from Deadzone to Max Force —

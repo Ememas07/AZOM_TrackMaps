@@ -117,18 +117,20 @@ namespace MozaPlugin.Hardware
                 bool Differs(string name, int value) => controller.OutputRegisterValue(dev, name) != value;
                 string dirName = $"mbooster-{prefix}-dir", minName = $"mbooster-{prefix}-min", maxName = $"mbooster-{prefix}-max";
                 if (cfg.Direction >= 0 && Differs(dirName, cfg.Direction)) controller.SendIntWrite(dirName, cfg.Direction, dev);
-                if (cfg.Min >= 0 && Differs(minName, cfg.Min)) controller.SendIntWrite(minName, cfg.Min, dev);
-                if (cfg.Max >= 0 && Differs(maxName, cfg.Max)) controller.SendIntWrite(maxName, cfg.Max, dev);
-                // Output curve: y1..y5 over the Min..Max range above, the
-                // registers Pit House writes for every pedal type.
-                var hwCurve = cfg.HardwareCurveY;
-                if (hwCurve != null && hwCurve.Length == 5)
+                // Output curve: y1..y5 over the Min..Max range, the registers
+                // Pit House writes for every pedal type. Written whole.
+                if (global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.TryOutputMapping(
+                        cfg, out int outMin, out int outMax, out float[] hwCurve))
+                {
+                    if (Differs(minName, outMin)) controller.SendIntWrite(minName, outMin, dev);
+                    if (Differs(maxName, outMax)) controller.SendIntWrite(maxName, outMax, dev);
                     for (int i = 0; i < 5; i++)
                     {
                         string yName = $"mbooster-{prefix}-y{i + 1}";
                         if (Differs(yName, (int)Math.Round(hwCurve[i])))
                             controller.SendFloatWrite(yName, hwCurve[i], dev);
                     }
+                }
                 // Travel / End Stop / Natural Friction / Segmented Damping are
                 // load-cell + motor Pedal Feel features living on brake-named
                 // SINGLETON cmdIds (0x84/0x85, 0xB2, 0xAE, 0xB7) with no
