@@ -801,4 +801,53 @@ Id: {2}</value></data>
   <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>适中</value></data>
   <data name="Option_SoftLimitHard" xml:space="preserve"><value>强硬</value></data>
   <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>中心死区补偿</value></data>
+  <data name="Motion_Error_PluginUnavailable" xml:space="preserve"><value>AZOM 插件的运动控制器连接未运行。</value></data>
+  <data name="Motion_Error_NotConnected" xml:space="preserve"><value>MOZA Motion Controller 未连接</value></data>
+  <data name="Motion_Error_Enrolling" xml:space="preserve"><value>MOZA Motion Controller 仍在启动中</value></data>
+  <data name="Motion_Error_PortUnassignedFmt" xml:space="preserve"><value>执行器端口 {0} 未分配角位</value></data>
+  <data name="Motion_Error_PortDuplicateFmt" xml:space="preserve"><value>执行器端口 {0} 使用的角位 {1} 已被分配</value></data>
+  <data name="Motion_Error_ActuatorsMissingFmt" xml:space="preserve"><value>已连接 {0}/{1} 个执行器</value></data>
+  <data name="Motion_Error_PortConfigPending" xml:space="preserve"><value>端口配置待完成：请运行端口自检</value></data>
+  <data name="Motion_Error_FaultFmt" xml:space="preserve"><value>运动控制器故障：{0}</value></data>
+  <data name="Motion_Corner_FrontLeft" xml:space="preserve"><value>左前</value></data>
+  <data name="Motion_Corner_FrontRight" xml:space="preserve"><value>右前</value></data>
+  <data name="Motion_Corner_RearLeft" xml:space="preserve"><value>左后</value></data>
+  <data name="Motion_Corner_RearRight" xml:space="preserve"><value>右后</value></data>
+  <data name="Motion_Corner_None" xml:space="preserve"><value>未分配</value></data>
+  <data name="Motion_Panel_Status" xml:space="preserve"><value>状态</value></data>
+  <data name="Motion_Panel_Connection" xml:space="preserve"><value>连接</value></data>
+  <data name="Motion_Panel_NotConnected" xml:space="preserve"><value>未连接</value></data>
+  <data name="Motion_Panel_State" xml:space="preserve"><value>阶段</value></data>
+  <data name="Motion_Panel_Mode" xml:space="preserve"><value>控制器模式</value></data>
+  <data name="Motion_Panel_Firmware" xml:space="preserve"><value>固件</value></data>
+  <data name="Motion_Panel_Actuators" xml:space="preserve"><value>执行器</value></data>
+  <data name="Motion_Panel_Errors" xml:space="preserve"><value>问题</value></data>
+  <data name="Motion_Panel_None" xml:space="preserve"><value>无</value></data>
+  <data name="Motion_Panel_Ports" xml:space="preserve"><value>执行器端口</value></data>
+  <data name="Motion_Panel_PortFmt" xml:space="preserve"><value>端口 {0}</value></data>
+  <data name="Motion_Panel_Identify" xml:space="preserve"><value>识别</value></data>
+  <data name="Motion_Panel_RunPortSelfTest" xml:space="preserve"><value>应用角位并运行端口自检</value></data>
+  <data name="Motion_Panel_RunTravelSelfCheck" xml:space="preserve"><value>运行行程自检</value></data>
+  <data name="Motion_Panel_Setup" xml:space="preserve"><value>设置</value></data>
+  <data name="Motion_Panel_MaxStroke" xml:space="preserve"><value>最大可用行程 (%)</value></data>
+  <data name="Motion_Panel_RigLength" xml:space="preserve"><value>执行器前后间距 (mm)</value></data>
+  <data name="Motion_Panel_RigWidth" xml:space="preserve"><value>执行器左右间距 (mm)</value></data>
+  <data name="Motion_Panel_Apply" xml:space="preserve"><value>应用</value></data>
+  <data name="Motion_Panel_Lighting" xml:space="preserve"><value>灯光</value></data>
+  <data name="Motion_Panel_Brightness" xml:space="preserve"><value>亮度 (%)</value></data>
+  <data name="Motion_Panel_ZoneFmt" xml:space="preserve"><value>区域 {0} 颜色</value></data>
+  <data name="Motion_Panel_ChangeColor" xml:space="preserve"><value>更改</value></data>
+  <data name="Motion_Phase_Disconnected" xml:space="preserve"><value>已断开</value></data>
+  <data name="Motion_Phase_Enrolling" xml:space="preserve"><value>启动中</value></data>
+  <data name="Motion_Phase_Ready" xml:space="preserve"><value>就绪</value></data>
+  <data name="Motion_Phase_SelfChecking" xml:space="preserve"><value>行程自检</value></data>
+  <data name="Motion_Phase_EnteringGame" xml:space="preserve"><value>正在进入游戏模式</value></data>
+  <data name="Motion_Phase_Game" xml:space="preserve"><value>运行中</value></data>
+  <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>正在停止</value></data>
+  <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>端口自检</value></data>
+  <data name="Motion_Phase_Faulted" xml:space="preserve"><value>故障</value></data>
+  <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion 未启用</value></data>
+  <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>已连接 MOZA Motion Controller，但 SimHub 的 Motion 插件未启用。请在 Settings &gt; Plugins 中启用它，然后在 Motion 中添加 MOZA HMA150 控制器。</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>未在 SimHub Motion 中添加 MOZA HMA150</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Body" xml:space="preserve"><value>已连接 MOZA Motion Controller，但当前的 SimHub Motion 配置中没有 MOZA HMA150 控制器。请在 Motion 中添加控制器并选择 MOZA HMA150 预设。</value></data>
 </root>

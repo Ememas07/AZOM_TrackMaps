@@ -808,4 +808,53 @@ Id: {2}</value></data>
   <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Middle</value></data>
   <data name="Option_SoftLimitHard" xml:space="preserve"><value>Hard</value></data>
   <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Center Deadzone Compensation</value></data>
+  <data name="Motion_Error_PluginUnavailable" xml:space="preserve"><value>The AZOM plugin's motion controller connection is not running.</value></data>
+  <data name="Motion_Error_NotConnected" xml:space="preserve"><value>MOZA Motion Controller not connected</value></data>
+  <data name="Motion_Error_Enrolling" xml:space="preserve"><value>MOZA Motion Controller is still starting up</value></data>
+  <data name="Motion_Error_PortUnassignedFmt" xml:space="preserve"><value>Actuator port {0} has no corner assigned</value></data>
+  <data name="Motion_Error_PortDuplicateFmt" xml:space="preserve"><value>Actuator port {0} uses corner {1}, which is already assigned</value></data>
+  <data name="Motion_Error_ActuatorsMissingFmt" xml:space="preserve"><value>{0} of {1} actuators connected</value></data>
+  <data name="Motion_Error_PortConfigPending" xml:space="preserve"><value>Port configuration pending: run the port self-test</value></data>
+  <data name="Motion_Error_FaultFmt" xml:space="preserve"><value>Motion controller fault: {0}</value></data>
+  <data name="Motion_Corner_FrontLeft" xml:space="preserve"><value>Front left</value></data>
+  <data name="Motion_Corner_FrontRight" xml:space="preserve"><value>Front right</value></data>
+  <data name="Motion_Corner_RearLeft" xml:space="preserve"><value>Rear left</value></data>
+  <data name="Motion_Corner_RearRight" xml:space="preserve"><value>Rear right</value></data>
+  <data name="Motion_Corner_None" xml:space="preserve"><value>Unassigned</value></data>
+  <data name="Motion_Panel_Status" xml:space="preserve"><value>Status</value></data>
+  <data name="Motion_Panel_Connection" xml:space="preserve"><value>Connection</value></data>
+  <data name="Motion_Panel_NotConnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="Motion_Panel_State" xml:space="preserve"><value>State</value></data>
+  <data name="Motion_Panel_Mode" xml:space="preserve"><value>Controller mode</value></data>
+  <data name="Motion_Panel_Firmware" xml:space="preserve"><value>Firmware</value></data>
+  <data name="Motion_Panel_Actuators" xml:space="preserve"><value>Actuators</value></data>
+  <data name="Motion_Panel_Errors" xml:space="preserve"><value>Problems</value></data>
+  <data name="Motion_Panel_None" xml:space="preserve"><value>None</value></data>
+  <data name="Motion_Panel_Ports" xml:space="preserve"><value>Actuator ports</value></data>
+  <data name="Motion_Panel_PortFmt" xml:space="preserve"><value>Port {0}</value></data>
+  <data name="Motion_Panel_Identify" xml:space="preserve"><value>Identify</value></data>
+  <data name="Motion_Panel_RunPortSelfTest" xml:space="preserve"><value>Apply corners and run port self-test</value></data>
+  <data name="Motion_Panel_RunTravelSelfCheck" xml:space="preserve"><value>Run travel self-check</value></data>
+  <data name="Motion_Panel_Setup" xml:space="preserve"><value>Setup</value></data>
+  <data name="Motion_Panel_MaxStroke" xml:space="preserve"><value>Max available stroke (%)</value></data>
+  <data name="Motion_Panel_RigLength" xml:space="preserve"><value>Actuator distance front to rear (mm)</value></data>
+  <data name="Motion_Panel_RigWidth" xml:space="preserve"><value>Actuator distance left to right (mm)</value></data>
+  <data name="Motion_Panel_Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="Motion_Panel_Lighting" xml:space="preserve"><value>Lighting</value></data>
+  <data name="Motion_Panel_Brightness" xml:space="preserve"><value>Brightness (%)</value></data>
+  <data name="Motion_Panel_ZoneFmt" xml:space="preserve"><value>Zone {0} colour</value></data>
+  <data name="Motion_Panel_ChangeColor" xml:space="preserve"><value>Change</value></data>
+  <data name="Motion_Phase_Disconnected" xml:space="preserve"><value>Disconnected</value></data>
+  <data name="Motion_Phase_Enrolling" xml:space="preserve"><value>Starting up</value></data>
+  <data name="Motion_Phase_Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Motion_Phase_SelfChecking" xml:space="preserve"><value>Travel self-check</value></data>
+  <data name="Motion_Phase_EnteringGame" xml:space="preserve"><value>Entering game mode</value></data>
+  <data name="Motion_Phase_Game" xml:space="preserve"><value>Running</value></data>
+  <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Stopping</value></data>
+  <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Port self-test</value></data>
+  <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Fault</value></data>
+  <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>SimHub Motion is not enabled</value></data>
+  <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>A MOZA Motion Controller is connected, but SimHub's Motion plugin is not enabled. Enable it under Settings &gt; Plugins, then add the MOZA HMA150 controller in Motion.</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>MOZA HMA150 not added in SimHub Motion</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Body" xml:space="preserve"><value>A MOZA Motion Controller is connected, but the active SimHub Motion setup has no MOZA HMA150 controller. In Motion, add a controller and pick the MOZA HMA150 preset.</value></data>
 </root>

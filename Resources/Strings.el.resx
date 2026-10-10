@@ -800,4 +800,53 @@ Id: {2}</value></data>
   <data name="Option_SoftLimitMiddle" xml:space="preserve"><value>Μεσαίο</value></data>
   <data name="Option_SoftLimitHard" xml:space="preserve"><value>Σκληρό</value></data>
   <data name="SliderLabel_DeadzoneCompensation" xml:space="preserve"><value>Αντιστάθμιση νεκρής ζώνης κέντρου</value></data>
+  <data name="Motion_Error_PluginUnavailable" xml:space="preserve"><value>Η σύνδεση του ελεγκτή κίνησης του πρόσθετου AZOM δεν εκτελείται.</value></data>
+  <data name="Motion_Error_NotConnected" xml:space="preserve"><value>Ο MOZA Motion Controller δεν είναι συνδεδεμένος</value></data>
+  <data name="Motion_Error_Enrolling" xml:space="preserve"><value>Ο MOZA Motion Controller ξεκινά ακόμα</value></data>
+  <data name="Motion_Error_PortUnassignedFmt" xml:space="preserve"><value>Η θύρα ενεργοποιητή {0} δεν έχει αντιστοιχισμένη γωνία</value></data>
+  <data name="Motion_Error_PortDuplicateFmt" xml:space="preserve"><value>Η θύρα ενεργοποιητή {0} χρησιμοποιεί τη γωνία {1}, η οποία έχει ήδη αντιστοιχιστεί</value></data>
+  <data name="Motion_Error_ActuatorsMissingFmt" xml:space="preserve"><value>{0} από {1} ενεργοποιητές συνδεδεμένοι</value></data>
+  <data name="Motion_Error_PortConfigPending" xml:space="preserve"><value>Εκκρεμεί η διαμόρφωση θυρών: εκτελέστε τον αυτοέλεγχο θυρών</value></data>
+  <data name="Motion_Error_FaultFmt" xml:space="preserve"><value>Σφάλμα ελεγκτή κίνησης: {0}</value></data>
+  <data name="Motion_Corner_FrontLeft" xml:space="preserve"><value>Εμπρός αριστερά</value></data>
+  <data name="Motion_Corner_FrontRight" xml:space="preserve"><value>Εμπρός δεξιά</value></data>
+  <data name="Motion_Corner_RearLeft" xml:space="preserve"><value>Πίσω αριστερά</value></data>
+  <data name="Motion_Corner_RearRight" xml:space="preserve"><value>Πίσω δεξιά</value></data>
+  <data name="Motion_Corner_None" xml:space="preserve"><value>Χωρίς αντιστοίχιση</value></data>
+  <data name="Motion_Panel_Status" xml:space="preserve"><value>Κατάσταση</value></data>
+  <data name="Motion_Panel_Connection" xml:space="preserve"><value>Σύνδεση</value></data>
+  <data name="Motion_Panel_NotConnected" xml:space="preserve"><value>Μη συνδεδεμένο</value></data>
+  <data name="Motion_Panel_State" xml:space="preserve"><value>Φάση</value></data>
+  <data name="Motion_Panel_Mode" xml:space="preserve"><value>Λειτουργία ελεγκτή</value></data>
+  <data name="Motion_Panel_Firmware" xml:space="preserve"><value>Υλικολογισμικό</value></data>
+  <data name="Motion_Panel_Actuators" xml:space="preserve"><value>Ενεργοποιητές</value></data>
+  <data name="Motion_Panel_Errors" xml:space="preserve"><value>Προβλήματα</value></data>
+  <data name="Motion_Panel_None" xml:space="preserve"><value>Κανένα</value></data>
+  <data name="Motion_Panel_Ports" xml:space="preserve"><value>Θύρες ενεργοποιητών</value></data>
+  <data name="Motion_Panel_PortFmt" xml:space="preserve"><value>Θύρα {0}</value></data>
+  <data name="Motion_Panel_Identify" xml:space="preserve"><value>Αναγνώριση</value></data>
+  <data name="Motion_Panel_RunPortSelfTest" xml:space="preserve"><value>Εφαρμογή γωνιών και εκτέλεση αυτοελέγχου θυρών</value></data>
+  <data name="Motion_Panel_RunTravelSelfCheck" xml:space="preserve"><value>Εκτέλεση αυτοελέγχου διαδρομής</value></data>
+  <data name="Motion_Panel_Setup" xml:space="preserve"><value>Ρύθμιση</value></data>
+  <data name="Motion_Panel_MaxStroke" xml:space="preserve"><value>Μέγιστη διαθέσιμη διαδρομή (%)</value></data>
+  <data name="Motion_Panel_RigLength" xml:space="preserve"><value>Απόσταση ενεργοποιητών εμπρός–πίσω (mm)</value></data>
+  <data name="Motion_Panel_RigWidth" xml:space="preserve"><value>Απόσταση ενεργοποιητών αριστερά–δεξιά (mm)</value></data>
+  <data name="Motion_Panel_Apply" xml:space="preserve"><value>Εφαρμογή</value></data>
+  <data name="Motion_Panel_Lighting" xml:space="preserve"><value>Φωτισμός</value></data>
+  <data name="Motion_Panel_Brightness" xml:space="preserve"><value>Φωτεινότητα (%)</value></data>
+  <data name="Motion_Panel_ZoneFmt" xml:space="preserve"><value>Χρώμα ζώνης {0}</value></data>
+  <data name="Motion_Panel_ChangeColor" xml:space="preserve"><value>Αλλαγή</value></data>
+  <data name="Motion_Phase_Disconnected" xml:space="preserve"><value>Αποσυνδεδεμένο</value></data>
+  <data name="Motion_Phase_Enrolling" xml:space="preserve"><value>Εκκίνηση</value></data>
+  <data name="Motion_Phase_Ready" xml:space="preserve"><value>Έτοιμο</value></data>
+  <data name="Motion_Phase_SelfChecking" xml:space="preserve"><value>Αυτοέλεγχος διαδρομής</value></data>
+  <data name="Motion_Phase_EnteringGame" xml:space="preserve"><value>Μετάβαση σε λειτουργία παιχνιδιού</value></data>
+  <data name="Motion_Phase_Game" xml:space="preserve"><value>Σε λειτουργία</value></data>
+  <data name="Motion_Phase_Disengaging" xml:space="preserve"><value>Διακοπή</value></data>
+  <data name="Motion_Phase_PortSelfTest" xml:space="preserve"><value>Αυτοέλεγχος θυρών</value></data>
+  <data name="Motion_Phase_Faulted" xml:space="preserve"><value>Σφάλμα</value></data>
+  <data name="Banner_MotionPluginDisabled_Title" xml:space="preserve"><value>Το SimHub Motion δεν είναι ενεργοποιημένο</value></data>
+  <data name="Banner_MotionPluginDisabled_Body" xml:space="preserve"><value>Ένας MOZA Motion Controller είναι συνδεδεμένος, αλλά το πρόσθετο Motion του SimHub δεν είναι ενεργοποιημένο. Ενεργοποιήστε το στο Settings &gt; Plugins και, στη συνέχεια, προσθέστε τον ελεγκτή MOZA HMA150 στο Motion.</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Title" xml:space="preserve"><value>Το MOZA HMA150 δεν έχει προστεθεί στο SimHub Motion</value></data>
+  <data name="Banner_ProfileNotAddedMotion_Body" xml:space="preserve"><value>Ένας MOZA Motion Controller είναι συνδεδεμένος, αλλά η ενεργή διάταξη του SimHub Motion δεν περιέχει ελεγκτή MOZA HMA150. Στο Motion, προσθέστε έναν ελεγκτή και επιλέξτε την προεπιλογή MOZA HMA150.</value></data>
 </root>

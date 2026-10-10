@@ -7,6 +7,7 @@ using System.Text;
 using MozaPlugin.Devices;
 using MozaPlugin.Protocol;
 using MozaPlugin.Devices.MBooster;
+using MozaPlugin.Devices.Motion;
 using MozaPlugin.Devices.Led;
 
 namespace MozaPlugin.UI
@@ -1267,6 +1268,46 @@ namespace MozaPlugin.UI
                 }
             }
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>
+        /// MOZA Motion Controller lane (HMA150 platform): lifecycle phase, controller mode
+        /// and flags, port map, setup values and the tail of the controller's own log.
+        /// </summary>
+        public static string BuildMotionController(MozaPlugin plugin)
+        {
+            var lane = plugin.MotionController;
+            if (lane == null) return "(motion lane not created)";
+            var s = lane.Snapshot();
+            if (!s.Connected)
+                return "(no MOZA Motion Controller — this lane claims PID 0x2000 from the registry)";
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Port:           {s.PortName ?? "-"}  phase={s.Phase}"
+                + (s.FaultReason != null ? $"  fault=\"{s.FaultReason}\"" : ""));
+            sb.AppendLine($"Identity:       {s.ModelName}  hw {s.HardwareId} {s.HardwareRevision}  "
+                + $"fw {s.FirmwareVersion}  hwver {s.HardwareVersion}  uid {s.Uid}");
+            sb.AppendLine($"Mode:           target={s.ModeTarget} current={s.ModeCurrent} flags=0x{s.Flags:X2} "
+                + $"runState={s.RunState} selfCheckPassed={s.SelfCheckPassed}");
+            sb.AppendLine($"Actuators:      supported={s.SupportedActuators} ports={s.PortCount} "
+                + $"present={s.ActuatorsPresent} enrolled={s.ActuatorsEnrolled}  "
+                + $"errors={(s.ActiveErrorCodes.Count == 0 ? "none" : string.Join(",", s.ActiveErrorCodes))}");
+            sb.AppendLine($"Setup:          maxStroke={Fmt(s.MaxStroke)} haptic={Fmt(s.HapticIntensity)} "
+                + $"rig={Fmt(s.RigLengthMm)} x {Fmt(s.RigWidthMm)} mm  framesSent={s.FramesSent}");
+            foreach (var p in s.Ports)
+            {
+                if (p.Present != true && p.Role is null or MotionCorner.None) continue;
+                sb.AppendLine($"  port {p.Port}: present={p.Present?.ToString() ?? "?"} slave={p.Slave} "
+                    + $"role={p.Role?.ToString() ?? "?"} word=0x{p.StatusWord:X8}");
+            }
+            var errors = lane.GetConfigurationErrors();
+            if (errors.Count > 0) sb.AppendLine("Config errors:  " + string.Join("; ", errors));
+            int from = Math.Max(0, s.RecentLog.Count - 40);
+            for (int i = from; i < s.RecentLog.Count; i++)
+                sb.AppendLine("  " + s.RecentLog[i]);
+            return sb.ToString();
+
+            static string Fmt(float? v) => v.HasValue ? v.Value.ToString("0.###", CultureInfo.InvariantCulture) : "?";
         }
     }
 }

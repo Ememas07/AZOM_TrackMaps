@@ -16,6 +16,10 @@ taken from vendor documentation.
 
 Wire framing is the standard MOZA `7E len group dev payload chk` frame with `0x7E` stuffing and
 the usual response transform (group `| 0x80`, device nibbles swapped) — see [`../wire/`](../wire/).
+The checksum counts every body `0x7E` twice, exactly as on the wheelbase bus: 3,009 captured
+frames with a `0x7E` in the body (all `0x22/00` telemetry) validate only that way. The handover
+bridge summed the unescaped bytes once, so its frames containing `0x7E` carried a bad checksum
+(fixed in `tools/hma150-bridge.ps1`).
 Nothing on this bus uses the session layer (`0x43`), tier definitions or dashboards.
 
 ## Topology
@@ -125,6 +129,9 @@ folded into [`game-stream-0x22.md`](game-stream-0x22.md) and [`effect-parameters
 | `tools/motion-decode log|streams|control|identity|registers <jsonl>` | the decoders behind every table on these pages |
 | `tools/motion-replay-correlate <jsonl> <replay-stem>` | field-by-field fit of the `0x22` stream against a SimHub replay (how the telemetry frame was identified) |
 | `tools/simhub_replay.py` | reader for SimHub session recordings (format in the module docstring) |
+| `tools/motion-frame-check` | rebuilds every captured host frame with Python mirrors of `Protocol/MozaMotionProtocol.cs` and diffs the bytes |
+| `tools/hma150-characterize.ps1` | Windows bench script: game mode with scripted `0x22/00` inputs (gain/washout, bandwidth, heave path, gating, `0x21/02` feedback, inferred setup writes); logs `{t,dir,hex}` JSONL for `motion-decode` |
+| `tools/hma150-bridge.ps1` | the handover's SimHub→controller bridge (raw-telemetry game mode), kept for reference; formula for its SimHub custom serial device in `tools/hma150-bridge-simhub-formula.js` |
 
 ## Status / open items
 
