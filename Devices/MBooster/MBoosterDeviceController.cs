@@ -1003,60 +1003,27 @@ namespace MozaPlugin.Devices.MBooster
         /// Travel (0x84/0x85), End Stop (0xB2), Natural Friction (0xAE),
         /// Virtual Damping (0xAD), Segmented Damping (0xB7), Deadzone/Max
         /// Force/feel curve (0xAB), Max Threshold (0xB3), Sensor Ratio (0x1A).
-        /// None of them carries a per-pedal selector, so they configure
-        /// whichever pedal owns that hardware on the device id they are sent
-        /// to.
+        /// None carries a per-pedal selector: they set the motor pedal of the
+        /// unit they are sent to.
         ///
-        /// Normally every motorized axis resolves to its own device id and the
-        /// answer is yes for all of them. But when two motorized axes land on
-        /// the SAME id — a routed chain whose role map hasn't resolved, so both
-        /// fall back to the host — they would take turns overwriting one
-        /// register set. Bug 34JAASN5 is exactly that: throttle 3.8/35.9mm and
-        /// brake 17.6/49.7mm hitting 0x19's travel registers 74ms apart on
-        /// every apply, last writer winning.
-        ///
-        /// In that case exactly one axis owns them: the pedal whose role the
-        /// registers are named for (Brake), else the lowest axis index, so the
-        /// choice is stable across applies rather than order-dependent.
+        /// That pedal is always the unit's local channel B, and 0x22 holds its
+        /// role — Pit House's model: a role change pushes the new role's feel
+        /// config to the unit with the 0x22 write (moza-simulator, 2026-09-29 /
+        /// 2026-10-10). So the owner is the axis whose role matches the 0x22
+        /// of the unit it addresses. A passive pedal (channel T/C, 0x21/0x23)
+        /// never matches, and two axes falling back to one id (34JAASN5's
+        /// unresolved routed chain) can't both own it. Until that unit's 0x22
+        /// has been read, nobody owns them; the read triggers a re-apply.
         /// </summary>
         public bool OwnsSingletonRegisters(int axisIndex)
         {
-            // Known types only — live, else last session's seed. Until one
-            // exists nobody owns them (IsAxisMotorized's "all motorized"
-            // default would hand them to a passive Brake-role axis); the
-            // re-apply when the diagnostic lands writes them.
-            var types = TabAxisTypes;
-            bool Motorized(int a) => types != null && a >= 0 && a < types.Length && types[a] == 1;
-            if (!Motorized(axisIndex)) return false;
-            if (!TryCalibDeviceForAxis(axisIndex, out byte mine)) return false;
-
-            int bestAxis = axisIndex;
-            int bestRank = SingletonOwnerRank(axisIndex);
-            for (int a = 0; a < MaxAxes; a++)
-            {
-                if (a == axisIndex || !Motorized(a)) continue;
-                if (!TryCalibDeviceForAxis(a, out byte other) || other != mine) continue;
-                int rank = SingletonOwnerRank(a);
-                if (rank < bestRank || (rank == bestRank && a < bestAxis))
-                {
-                    bestRank = rank;
-                    bestAxis = a;
-                }
-            }
-            return bestAxis == axisIndex;
-        }
-
-        // Brake wins (the registers are its own hardware), then throttle, then
-        // clutch, then an unresolved role.
-        private int SingletonOwnerRank(int axisIndex)
-        {
-            switch (RoleIndexForAxis(axisIndex))
-            {
-                case 1: return 0;   // Brake
-                case 0: return 1;   // Throttle
-                case 2: return 2;   // Clutch
-                default: return 3;
-            }
+            int role = RoleIndexForAxis(axisIndex);
+            if (role < 0 || !TryCalibDeviceForAxis(axisIndex, out byte mine)) return false;
+            if (StatusValue(mine, "mbooster-status-22") != role + 1) return false;
+            for (int a = 0; a < axisIndex; a++)
+                if (RoleIndexForAxis(a) == role && TryCalibDeviceForAxis(a, out byte other) && other == mine)
+                    return false;
+            return true;
         }
 
         /// <summary>Command-name prefix ("throttle"/"brake"/"clutch") for an
@@ -1242,7 +1209,21 @@ namespace MozaPlugin.Devices.MBooster
         private void StoreStatusRegister(byte device, string name, int value)
         {
             if (name != "mbooster-motor-cal-locate" && Array.IndexOf(StatusReadNames, name) < 0) return;
-            lock (_statusLock) _statusRegs[$"{device:x2}:{name}"] = value;
+            string key = $"{device:x2}:{name}";
+            bool firstMotorRole;
+            lock (_statusLock)
+            {
+                firstMotorRole = name == "mbooster-status-22" && !_statusRegs.ContainsKey(key);
+                _statusRegs[key] = value;
+            }
+            // The unit's motor-pedal role decides who owns its singleton
+            // registers (OwnsSingletonRegisters); the connect-time apply ran
+            // before it was read, so re-apply now that it's known.
+            if (firstMotorRole)
+            {
+                try { RoutingResolved?.Invoke(false); }
+                catch (Exception ex) { MozaLog.Debug($"[AZOM/mBooster] RoutingResolved handler: {ex.Message}"); }
+            }
         }
 
         // Latest read-back / write-echo of each per-role output register

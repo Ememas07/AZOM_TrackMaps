@@ -363,12 +363,18 @@ still replayed on every connect. Max Threshold and Sensor Ratio used to be
 gated by role only (Brake), which let a PASSIVE Brake-role pedal — the
 active pedal's role set to something else — push its ratio/threshold onto
 the active pedal's load cell; they now need the Brake role AND load-cell
-ownership (`OwnsSingletonRegisters`), in the apply, the UI write path and
-`MBoosterBrakeOnlyPanel`'s visibility. Ownership counts only KNOWN types
-(live diagnostic, else last session's seed): with neither, no axis owns the
-singletons, rather than every axis counting as motorized and the
-Brake-role axis winning whatever its type; the `RoutingResolved` re-apply
-writes them once the diagnostic lands. The per-role output curve
+ownership, in the apply, the UI write path and `MBoosterBrakeOnlyPanel`'s
+visibility.
+
+Ownership (`OwnsSingletonRegisters`) follows Pit House's model rather than
+the once-a-minute type diagnostic: a unit's motor pedal is always its local
+channel B and `0x22` holds that pedal's role (a role change pushes the new
+role's feel config with the `0x22` write — see the role-change captures
+below), so the owner is the axis whose role equals the `0x22` of the unit it
+addresses. A passive pedal (channel T/C) never matches, and two axes falling
+back to one id (34JAASN5's unresolved routed chain) can't both own it. Until
+a unit's `0x22` is read nobody owns its singletons; the first `0x22`
+read-back re-applies the lane. The per-role output curve
 (`mbooster-{throttle,brake,clutch}-y1..y5`) and raw Direction/Min/Max are
 NOT affected — those genuinely are per-pedal registers that the host
 aggregates, and a passive pedal has them.
