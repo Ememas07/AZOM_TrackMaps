@@ -31,6 +31,9 @@ All notable changes to the AZOM plugin are documented here.
   and range are now saved together; a profile that had only part of them takes the rest from the
   pedal once.
 
+- **"Apply profile settings on launch" off now leaves your devices alone.** Connecting a device no
+  longer writes the saved profile; it's applied when you switch profiles or import one.
+
 - **Multiple standalone mBooster pedals read from the correct axis.**
 
 - **Dashboard data on session 0x01 is acknowledged again.** When the wheel skipped the open ack, its

@@ -718,7 +718,7 @@ namespace MozaPlugin.UI
             var c = CurrentMBoosterController();
             var s = CurrentMBoosterSettings();
             if (c == null || s == null) return;
-            _plugin.HardwareApplier.ApplyMBoosterToHardware(c, s);
+            _plugin.HardwareApplier.ApplyMBoosterToHardware(c, s, userRequested: true);
         }
 
         // ------- Language picker (Options tab) -------

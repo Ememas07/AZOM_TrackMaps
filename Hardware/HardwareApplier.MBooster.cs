@@ -21,9 +21,10 @@ namespace MozaPlugin.Hardware
         /// produces zero hardware writes. Per protocol note § 6 these
         /// commands are "likely but unverified" on mBooster firmware.
         /// </summary>
-        internal void ApplyMBoosterToHardware(MBoosterDeviceController controller, MBoosterDeviceSettings s)
+        internal void ApplyMBoosterToHardware(MBoosterDeviceController controller, MBoosterDeviceSettings s, bool userRequested = false)
         {
             if (controller == null || s == null || !controller.IsConnected) return;
+            if (!userRequested && !ProfileWritesAllowed) return;
 
             // Route Direction / Min / Max / output-curve to the command slot
             // matching the pedal's ROLE. This used to be hardcoded to the
