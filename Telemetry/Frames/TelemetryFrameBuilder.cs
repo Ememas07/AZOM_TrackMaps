@@ -322,10 +322,11 @@ namespace MozaPlugin.Telemetry.Frames
                 return;
             }
             if (float.IsNaN(y) || float.IsInfinity(y)) y = 0f;
+            // A live car clamps to 1, never 0 — zero is the empty-slot marker.
             var t = _mapTransform;
-            uint fy = (uint)ClampInt(t.CenterY + Round(y * t.ScaleY), 0, 0xFFFF);
-            uint fz = (uint)ClampInt(t.CenterZ + Round(z * t.ScaleZ), 0, 0xFFFFFF);
-            uint fx = (uint)ClampInt(t.CenterX + Round(x * t.ScaleX), 0, 0xFFFFFF);
+            uint fy = (uint)ClampInt(t.CenterY + Round(y * t.ScaleY), 1, 0xFFFF);
+            uint fz = (uint)ClampInt(t.CenterZ + Round(z * t.ScaleZ), 1, 0xFFFFFF);
+            uint fx = (uint)ClampInt(t.CenterX + Round(x * t.ScaleX), 1, 0xFFFFFF);
             _bitWriter!.WriteBits(fy, 16);
             _bitWriter!.WriteBits(fz, 24);
             _bitWriter!.WriteBits(fx, 24);

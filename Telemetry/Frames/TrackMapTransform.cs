@@ -61,6 +61,7 @@ namespace MozaPlugin.Telemetry.Frames
         // sizes S so the track spans ~95 % of the window (S = 0.95·2^20 / extent on
         // Imola/Spa/Zandvoort); we leave more room since the bounds are trimmed.
         private const double FieldX = 1048576.0;   // 2^20, normalised X span
+        private const double FieldY = 65536.0;     // 2^16, Y field span
         private const int BoundsCenterX = 0x480000;
         private const int BoundsCenterZ = 0x800000;
         private const double BoundsFill = 0.9;
@@ -72,14 +73,17 @@ namespace MozaPlugin.Telemetry.Frames
         {
             double ext = Math.Max(maxX - minX, maxZ - minZ);
             double s = BoundsFill * FieldX / ext;
+            // Elevation shares S unless the track's height range overflows the 16-bit
+            // field (Bathurst: 191 m × 442/m), which would clamp the low end to 0.
+            double sy = maxY - minY > 0.0 ? Math.Min(s, BoundsFill * FieldY / (maxY - minY)) : s;
             return new TrackMapTransform
             {
                 ScaleX = (float)s,
                 ScaleZ = (float)(16.0 * s),
-                ScaleY = (float)s,
+                ScaleY = (float)sy,
                 CenterX = (int)Math.Round(BoundsCenterX - s * (minX + maxX) / 2.0),
                 CenterZ = (int)Math.Round(BoundsCenterZ - 16.0 * s * (minZ + maxZ) / 2.0),
-                CenterY = (int)Math.Round(CenterYConst - s * (minY + maxY) / 2.0),
+                CenterY = (int)Math.Round(CenterYConst - sy * (minY + maxY) / 2.0),
                 Source = $"bounds:{(int)(maxX - minX)}x{(int)(maxZ - minZ)}m",
             };
         }

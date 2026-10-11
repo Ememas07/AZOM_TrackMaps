@@ -73,7 +73,9 @@ tracks, with `E` the track's larger dimension from AC's map.ini,
 - **AC** — `TrackMapTransform.ResolveMapIni` (track's map.ini).
 - **Everything else** — `TrackMapTransform.FromBounds`: the 1 %-trimmed bounding
   box of SimHub's recorded map (`PersistantTrackerPlugin.GetMap()`), centred, at
-  90 % fill. Refit whenever SimHub swaps the map record.
+  90 % fill. Refit whenever SimHub swaps the map record. Y (u16) gets a smaller
+  scale when the elevation range would overflow it (Bathurst: 191 m) — a clamped
+  0 there collides with the empty-slot marker. Live fields clamp to ≥ 1 for the same reason.
 - **No map yet** — fixed `Fallback()` (SCALE_FACTOR 1.2 at world origin). Large
   tracks clamp; `tools/trackmap_replay_sim.py` measures it on a replay (iRacing
   Road Atlanta: 28 % of positions clamped).
