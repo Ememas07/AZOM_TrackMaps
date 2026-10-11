@@ -36,10 +36,10 @@ linear (R²=1.0) **across x=0**, where a float's sign bit would flip and break
 linearity. The high byte of each field also ramps smoothly (a float exponent
 would not).
 
-### Scale & offset are track-specific (and the wheel auto-fits)
+### Scale & offset are track-specific
 
 The per-axis scale `S` and the centre offsets differ by track and are **not**
-derivable from spline length or AC's `map.ini` (checked: `S/SCALE_FACTOR` is
+derivable from spline length or SCALE_FACTOR alone (`S/SCALE_FACTOR` is
 459.8 for Imola vs 379.0 for Spa — not constant):
 
 | Track | S (X & Y) | Z scale | Z/X ratio |
@@ -53,15 +53,44 @@ Two robust facts hold on both tracks:
 - The track occupies only a small, off-centre slice of the field (PitHouse's
   values sit around 4.3–4.9 M of the 16.7 M u24 range).
 
-Because the track fills <5 % of the field off-centre, **and** Z is sent 16×
-finer than X (a 1:1 renderer would squash the map 16:1), the wheel's map widget
-**must auto-normalise each axis independently** for display. Therefore the
-absolute scale/offset are **not load-bearing** — any consistent linear
-projection in the right packed layout renders correctly. The plugin
-(`TelemetryFrameBuilder.WritePackedLocation`) uses fixed `S=128`, `Z=2048`,
-centres `2^23` (X/Z) and `2^15` (Y) — chosen so any track (±several km) stays in
-range — and preserves PitHouse's 16× Z ratio. Confirm on hardware; tune the
-`MapScale*` constants if the map looks mis-sized.
+The 16× ratio is a normalisation, not a squash: PitHouse's X always sits at
+`0x48xxxx` (top nibble 4), and its **low 20 bits** are centred on `2^19` exactly
+as Z's 24 bits are centred on `2^23`. So `X_low20 / 2^20` and `Z / 2^24` are the
+same unit — one window, one scale:
+
+```
+X = 0x480000 + S·(x − cx)        Z = 0x800000 + 16·S·(z − cz)
+```
+
+`S = 2^20 · 0.95 / E` reproduces PitHouse's fitted S within 0.5 % on all three
+tracks, with `E` the track's larger dimension from AC's map.ini,
+`(max(WIDTH,HEIGHT) − 2·MARGIN)·SCALE_FACTOR`: 552.0 / 493.2 / 1196.4 vs measured
+551.7 / 492.7 / 1201.95 (Imola / Spa / Zandvoort). The window does not auto-fit
+(on hardware a mismatched scale/centre drew nothing); fields are clamped.
+
+### Transform source by game
+
+- **AC** — `TrackMapTransform.ResolveMapIni` (track's map.ini).
+- **Everything else** — `TrackMapTransform.FromBounds`: the 1 %-trimmed bounding
+  box of SimHub's recorded map (`PersistantTrackerPlugin.GetMap()`), centred, at
+  90 % fill. Refit whenever SimHub swaps the map record.
+- **No map yet** — fixed `Fallback()` (SCALE_FACTOR 1.2 at world origin). Large
+  tracks clamp; `tools/trackmap_replay_sim.py` measures it on a replay (iRacing
+  Road Atlanta: 28 % of positions clamped).
+
+### iRacing (lap-relative coordinates)
+
+iRacing has no world positions. SimHub reports every car, player included, as
+`[LapDistPct, 0, 0]` and resolves it through the recorded map
+(`DataRecordBase.ToAbsoluteCoordinates` → interpolated `CarCoordinates[].Value`,
+built by `CoordinatesCreator` from YawNorth/LapDist/Pitch). Consequences:
+
+- Without a map there is nothing to plot (raw pct would collapse every car onto
+  one point); the plugin sends empty slots until SimHub has one.
+- The map's own points are already in the resolved space — they must not be run
+  through `ToAbsoluteCoordinates` again (that reads X as a lap fraction).
+- Cars are on the recorded line: no lateral position, so the radar shows gaps
+  along the line only.
 
 ### Empty slots
 
