@@ -517,7 +517,7 @@ namespace MozaPlugin.UI
             var s = CurrentMBoosterEffectTarget();
             if (s == null) return;
             s.SensorOutputRatioPct = v;
-            QueueMBoosterCalibPush("angle-ratio",
+            QueueMBoosterPedalFeelPush("angle-ratio",
                 (c, dev) => c.SendFloatWrite("mbooster-brake-angle-ratio", v, dev));
             _plugin.SaveSettings();
         }
@@ -534,7 +534,7 @@ namespace MozaPlugin.UI
                 var s = CurrentMBoosterEffectTarget();
                 if (s == null) return;
                 s.MaxThresholdKg = v;
-                QueueMBoosterCalibPush("brake-threshold", (c, dev) =>
+                QueueMBoosterPedalFeelPush("brake-threshold", (c, dev) =>
                     c.SendIntWrite("mbooster-brake-threshold",
                         global::MozaPlugin.Protocol.MozaMBoosterProtocol.EncodeThresholdKg(v), dev));
             });
@@ -680,7 +680,7 @@ namespace MozaPlugin.UI
             // Built inside the parked action so the flush sends whatever the
             // plots hold when the drag settles, not a mid-drag snapshot.
             QueueMBoosterPedalFeelPush("segdamp", (c, dev) =>
-                c.SendOneShot(global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
+                c.SendSegmentedDampingIfChanged(global::MozaPlugin.Protocol.MozaMBoosterProtocol.BuildSegmentedDampingFrame(
                     sd.Divider1Pressed >= 0 ? sd.Divider1Pressed : MBoosterUiConstants.SegDampDivider1PressedDefaultPct,
                     sd.Divider2Pressed >= 0 ? sd.Divider2Pressed : MBoosterUiConstants.SegDampDivider2PressedDefaultPct,
                     sd.Divider1Released >= 0 ? sd.Divider1Released : MBoosterUiConstants.SegDampDivider1ReleasedDefaultPct,
@@ -691,7 +691,7 @@ namespace MozaPlugin.UI
                     !enabled ? 0 : sd.Seg2Released >= 0 ? sd.Seg2Released : MBoosterUiConstants.SegDampSegDefaultPct,
                     !enabled ? 0 : sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : MBoosterUiConstants.SegDampSegDefaultPct,
                     !enabled ? 0 : sd.Seg3Released >= 0 ? sd.Seg3Released : MBoosterUiConstants.SegDampSegDefaultPct,
-                    dev)));
+                    dev), dev));
         }
 
         // Master on/off for the whole Segmented Damping feature — see

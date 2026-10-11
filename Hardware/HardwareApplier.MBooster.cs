@@ -117,8 +117,9 @@ namespace MozaPlugin.Hardware
                 bool Differs(string name, int value) => controller.OutputRegisterValue(dev, name) != value;
                 string dirName = $"mbooster-{prefix}-dir", minName = $"mbooster-{prefix}-min", maxName = $"mbooster-{prefix}-max";
                 if (cfg.Direction >= 0 && Differs(dirName, cfg.Direction)) controller.SendIntWrite(dirName, cfg.Direction, dev);
-                if (cfg.Min >= 0 && Differs(minName, cfg.Min)) controller.SendIntWrite(minName, cfg.Min, dev);
+                // Max before min, as Pit House writes them.
                 if (cfg.Max >= 0 && Differs(maxName, cfg.Max)) controller.SendIntWrite(maxName, cfg.Max, dev);
+                if (cfg.Min >= 0 && Differs(minName, cfg.Min)) controller.SendIntWrite(minName, cfg.Min, dev);
                 // Output curve: y1..y5 over the Min..Max range above, the
                 // registers Pit House writes for every pedal type.
                 var hwCurve = cfg.HardwareCurveY;
@@ -226,11 +227,14 @@ namespace MozaPlugin.Hardware
                         !sdEnabled ? 0 : sd.Seg3Pressed >= 0 ? sd.Seg3Pressed : c,
                         !sdEnabled ? 0 : sd.Seg3Released >= 0 ? sd.Seg3Released : c,
                         dev);
-                    controller.SendOneShot(frame);
+                    controller.SendSegmentedDampingIfChanged(frame, dev);
                 }
-                if (role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake)
+                // Load-cell registers like the ones above: only from the axis
+                // that owns them, never a passive Brake-role pedal's config.
+                if (ownsPedalFeelHardware && role == global::MozaPlugin.Devices.MBooster.MBoosterRole.Brake)
                 {
-                    if (cfg.SensorOutputRatioPct >= 0)
+                    if (cfg.SensorOutputRatioPct >= 0
+                        && Differs("mbooster-brake-angle-ratio", (int)Math.Round(cfg.SensorOutputRatioPct)))
                     {
                         controller.SendFloatWrite("mbooster-brake-angle-ratio", cfg.SensorOutputRatioPct, dev);
                     }

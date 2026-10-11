@@ -359,9 +359,16 @@ registers instead: in KY3HK4QP the passive throttle page's 3.8/35.9 mm
 travel is exactly what the brake unit committed as Params 48/49. The UI
 hides them for a passive pedal, and `ApplyMBoosterToHardware` skips them
 for a non-motorized axis so values saved before that gate existed aren't
-still replayed on every connect. Max Threshold and Sensor Ratio were
-already gated the same way, by role rather than by type
-(`MBoosterBrakeOnlyPanel`). The per-role output curve
+still replayed on every connect. Max Threshold and Sensor Ratio used to be
+gated by role only (Brake), which let a PASSIVE Brake-role pedal — the
+active pedal's role set to something else — push its ratio/threshold onto
+the active pedal's load cell; they now need the Brake role AND load-cell
+ownership (`OwnsSingletonRegisters`), in the apply, the UI write path and
+`MBoosterBrakeOnlyPanel`'s visibility. Ownership counts only KNOWN types
+(live diagnostic, else last session's seed): with neither, no axis owns the
+singletons, rather than every axis counting as motorized and the
+Brake-role axis winning whatever its type; the `RoutingResolved` re-apply
+writes them once the diagnostic lands. The per-role output curve
 (`mbooster-{throttle,brake,clutch}-y1..y5`) and raw Direction/Min/Max are
 NOT affected — those genuinely are per-pedal registers that the host
 aggregates, and a passive pedal has them.
@@ -1718,7 +1725,23 @@ Threshold's effect is applied host-side.
     ranges like 10–95 and 5–95 (3RJGVGT5, NPN9FR6W) that profiles storing
     only `Min` never held.
 
-  A profile storing none of it leaves the unit alone. The live input marker is hidden on this curve: it runs on the
+  A profile storing none of it leaves the unit alone. Pit House's connect
+  push (moza-simulator, 2026-10-11, two runs) writes `<role>-max` before
+  `<role>-min`, then `y1..y4` and the sensor ratio; the apply uses the same
+  max-then-min order. Every config write to a unit — apply and UI alike,
+  any role (`MBoosterDeviceController.SendIntWrite`/`SendFloatWrite`) —
+  is skipped when the unit already reports that value by read-back or
+  write echo: the per-role output registers, the sensor ratio, Max
+  Threshold, the Pedal Feel registers (travel, end stops, friction,
+  damping, deadzone / curve / max force) and the sleep timeout. A
+  Segmented Damping frame (no named read-back) is skipped when identical
+  to the last one sent since connect. So the launch, base-detect and
+  wheel-detect applies (three in the first ~5 s) write each value once,
+  and an unchanged profile switch writes nothing. A dropped write leaves
+  the old value cached and is retried; the cache is cleared on
+  disconnect. Each of these is a flash parameter write on the unit
+  (firmware `param_manage.c ... Written`, AA3FY2YZ).
+  The live input marker is hidden on this curve: it runs on the
   device, and AZOM has no reading of its input to place.
 
   **History.** From bug bundle 5VR5AQ8Y until bug report NPN9FR6W this
