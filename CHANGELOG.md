@@ -19,6 +19,10 @@ All notable changes to the AZOM plugin are documented here.
 
 ## Fixed
 
+- **The dashboard connects after swapping to a display wheel.** The plugin re-learns which session the
+  wheel put its catalog on instead of reusing the previous wheel's, and restarts when the wheel closes
+  the session a tier definition was sent on.
+
 - **Track-map dots line up in iRacing and other non-AC games.** The map is fitted to SimHub's
   recorded track instead of a fixed scale that clipped larger tracks.
 
