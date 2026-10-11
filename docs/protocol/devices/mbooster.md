@@ -1703,16 +1703,22 @@ Threshold's effect is applied host-side.
   (`MozaCurveEditor.EndpointRangeMode`: start X = Min, Y pinned at 0; end
   X = Max; middle points derived), stored in the fields the Pedals tab
   uses for a passive pedal, and written by the connect/profile apply and
-  the UI. Curve and range are **one setting per profile**
-  (`MozaMBoosterRegistry.TryOutputMapping`): once a profile stores any of
-  `HardwareCurveY`/`Min`/`Max`, the apply writes all of them, unset parts
-  as Linear / 0 / 100. Applying only the set parts let the previous
-  profile's range ride under the next profile's curve (bug report 3RJGVGT5:
-  one profile's 18–96 brake range stayed on the unit through switches to
-  profiles that stored only a curve). A profile storing none of them
-  leaves the unit alone. A UI edit to any part first stores the whole
-  mapping as shown (`PinOutputMapping`: the profile's own, else the unit's
-  read-back, else Linear 0–100). The live input marker is hidden on this curve: it runs on the
+  the UI. Curve and range are **one setting per profile**. The apply
+  writes only the parts a profile stores, so a profile storing part of it
+  ran the rest from whichever profile was applied before (bug report
+  3RJGVGT5: one profile's 18–96 brake range stayed on the unit through
+  switches to profiles that stored only a curve). So the parts are
+  stored together (`MozaMBoosterRegistry.PinOutputMapping`: each part the
+  profile's own, else the unit's read-back, else Linear 0–100):
+  - by a UI edit to any part, from the values the editor shows;
+  - by every apply, before it writes, for each profile's pedal holding a
+    partial mapping, once the unit has reported all seven registers
+    (`HardwareApplier.PinPartialOutputMappings`). Unset parts are not
+    filled with 0/100: passive CRP2 pedals behind an mBooster read back
+    ranges like 10–95 and 5–95 (3RJGVGT5, NPN9FR6W) that profiles storing
+    only `Min` never held.
+
+  A profile storing none of it leaves the unit alone. The live input marker is hidden on this curve: it runs on the
   device, and AZOM has no reading of its input to place.
 
   **History.** From bug bundle 5VR5AQ8Y until bug report NPN9FR6W this

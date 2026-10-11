@@ -67,6 +67,8 @@ namespace MozaPlugin.Hardware
                     controller.SyncPedalRole(axis, global::MozaPlugin.Devices.MBooster.MBoosterDeviceController.RoleIndexOf(desired));
             }
 
+            PinPartialOutputMappings(controller, s);
+
             for (int axis = 0; axis < axisCount && axis < global::MozaPlugin.Devices.MBooster.MBoosterDeviceController.MaxAxes; axis++)
             {
                 if (connectedAxes != null && (axis >= connectedAxes.Length || !connectedAxes[axis]))
@@ -81,11 +83,8 @@ namespace MozaPlugin.Hardware
 
                 // This pedal's full config: master flat fields (axis 0) or its
                 // per-pedal entry. An unconfigured chained pedal writes nothing.
-                global::MozaPlugin.Devices.MBooster.IMBoosterPedalConfig cfg;
-                if (axis == 0) cfg = s;
-                else if (s.Pedals != null && s.Pedals.TryGetValue(axis, out var p) && p != null) cfg = p;
-                else if (axis == soleAxis) cfg = s;
-                else continue;
+                var cfg = PedalConfigForAxis(s, axis, soleAxis);
+                if (cfg == null) continue;
 
                 // Every per-pedal calibration here is a PHYSICAL setting stored
                 // on that pedal's own mBooster unit (confirmed on hardware: each
@@ -117,20 +116,18 @@ namespace MozaPlugin.Hardware
                 bool Differs(string name, int value) => controller.OutputRegisterValue(dev, name) != value;
                 string dirName = $"mbooster-{prefix}-dir", minName = $"mbooster-{prefix}-min", maxName = $"mbooster-{prefix}-max";
                 if (cfg.Direction >= 0 && Differs(dirName, cfg.Direction)) controller.SendIntWrite(dirName, cfg.Direction, dev);
-                // Output curve: y1..y5 over the Min..Max range, the registers
-                // Pit House writes for every pedal type. Written whole.
-                if (global::MozaPlugin.Devices.MBooster.MozaMBoosterRegistry.TryOutputMapping(
-                        cfg, out int outMin, out int outMax, out float[] hwCurve))
-                {
-                    if (Differs(minName, outMin)) controller.SendIntWrite(minName, outMin, dev);
-                    if (Differs(maxName, outMax)) controller.SendIntWrite(maxName, outMax, dev);
+                if (cfg.Min >= 0 && Differs(minName, cfg.Min)) controller.SendIntWrite(minName, cfg.Min, dev);
+                if (cfg.Max >= 0 && Differs(maxName, cfg.Max)) controller.SendIntWrite(maxName, cfg.Max, dev);
+                // Output curve: y1..y5 over the Min..Max range above, the
+                // registers Pit House writes for every pedal type.
+                var hwCurve = cfg.HardwareCurveY;
+                if (hwCurve != null && hwCurve.Length == 5)
                     for (int i = 0; i < 5; i++)
                     {
                         string yName = $"mbooster-{prefix}-y{i + 1}";
                         if (Differs(yName, (int)Math.Round(hwCurve[i])))
                             controller.SendFloatWrite(yName, hwCurve[i], dev);
                     }
-                }
                 // Travel / End Stop / Natural Friction / Segmented Damping are
                 // load-cell + motor Pedal Feel features living on brake-named
                 // SINGLETON cmdIds (0x84/0x85, 0xB2, 0xAE, 0xB7) with no
@@ -269,6 +266,53 @@ namespace MozaPlugin.Hardware
             // Lane-wide; lives on the host unit only.
             if (s.SleepMinutes >= 0)
                 controller.SendIntWrite("mbooster-sleep-minutes", s.SleepMinutes, controller.HostDeviceId);
+        }
+
+        /// <summary>One pedal's config: master flat fields (axis 0, or the
+        /// lane's sole pedal without its own entry) or its per-pedal entry;
+        /// null for an unconfigured chained pedal.</summary>
+        private static IMBoosterPedalConfig? PedalConfigForAxis(MBoosterDeviceSettings s, int axis, int soleAxis)
+        {
+            if (axis == 0) return s;
+            if (s.Pedals != null && s.Pedals.TryGetValue(axis, out var p) && p != null) return p;
+            return axis == soleAxis ? s : null;
+        }
+
+        /// <summary>
+        /// Fill the unset parts of every profile's output mapping (curve, Min,
+        /// Max) for this unit from what its pedals report, before the apply
+        /// writes anything. A profile storing only part of it otherwise ran
+        /// the rest from whichever profile was applied before it (bug report
+        /// 3RJGVGT5). A pedal whose registers haven't all reported yet waits
+        /// for a later apply.
+        /// </summary>
+        private void PinPartialOutputMappings(MBoosterDeviceController controller, MBoosterDeviceSettings current)
+        {
+            var all = _plugin.MBoosterSettingsInAllProfiles(controller.Identity);
+            if (!all.Contains(current)) all.Add(current);
+            int roleAxisCount = controller.ConnectedAxisCount;
+            int soleAxis = controller.SoleConnectedAxis();
+            var connectedAxes = controller.ConnectedAxes;
+            int pinned = 0;
+            foreach (var s in all)
+                for (int axis = 0; axis < controller.AxisSlotCount && axis < MBoosterDeviceController.MaxAxes; axis++)
+                {
+                    if (connectedAxes != null && (axis >= connectedAxes.Length || !connectedAxes[axis]))
+                        continue;
+                    var cfg = PedalConfigForAxis(s, axis, soleAxis);
+                    if (cfg == null || !MozaMBoosterRegistry.IsPartialOutputMapping(cfg)) continue;
+                    var role = MozaMBoosterRegistry.ResolveAxisRole(s, axis, roleAxisCount);
+                    int roleIdx = MBoosterDeviceController.RoleIndexOf(role);
+                    if (roleIdx < 0 || !controller.TryConfigDeviceForRole(roleIdx, axis, out byte dev)) continue;
+                    string prefix = role.ToString().ToLowerInvariant();
+                    Func<string, int> reported = f => controller.OutputRegisterValue(dev, $"mbooster-{prefix}-{f}");
+                    if (!MozaMBoosterRegistry.HasOutputReadBack(reported)) continue;
+                    MozaMBoosterRegistry.PinOutputMapping(cfg, reported);
+                    pinned++;
+                }
+            if (pinned == 0) return;
+            MozaLog.Info($"[AZOM/mBooster] {MBoosterDeviceController.ShortIdentity(controller.Identity)} output curve/range completed from the unit's read-back for {pinned} pedal config(s)");
+            _plugin.PersistSettings();
         }
     }
 }
