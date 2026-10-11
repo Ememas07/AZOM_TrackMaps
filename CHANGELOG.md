@@ -2,12 +2,21 @@
 
 All notable changes to the AZOM plugin are documented here.
 
-## [1.6.4]
+## [1.7.0]
 
 ## Added
 
 - **MOZA HMA150 motion platform in SimHub Motion (preview).** Pick the MOZA HMA150 preset in
-  Motion; port setup, self-tests, stroke and lighting are in its settings.
+  Motion; it drives pitch, roll and heave, and port setup, self-tests, stroke and lighting are in
+  its settings.
+
+## Fixed
+
+- **The MOZA Motion Controller is no longer probed as a wheelbase or AB9.**
+
+## [1.6.4]
+
+## Added
 
 - **Soft limit strength: Soft, Middle or Hard, as in Pit House.** Sets the soft limit to 50, 75 or
   100% of its maximum. It's saved in profiles and imported from Pit House presets.
@@ -21,8 +30,6 @@ All notable changes to the AZOM plugin are documented here.
 - **Game FFB intensity goes up to 200%.** That's Pit House's range. It used to stop at 100%.
 
 ## Fixed
-
-- **The MOZA Motion Controller is no longer probed as a wheelbase or AB9.**
 
 - **The mBooster output curve is set on the pedal correctly.** Its start and end points set
   the pedal's range, and the four points between stay evenly spaced.

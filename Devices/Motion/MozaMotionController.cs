@@ -35,6 +35,9 @@ namespace MozaPlugin.Devices.Motion
         private const int GameLossToleranceMs = 1_500;
         private const int PortSelfTestTimeoutMs = 40_000;
         private const int LogRingSize = 200;
+        private const int EnrolReadSpacingMs = 15;
+        private const int EnrolRetryMs = 500;
+        private const int EnrolTimeoutMs = 5_000;
 
         private readonly MozaSerialConnection _connection;
         private readonly Func<bool> _isShuttingDown;
@@ -450,6 +453,12 @@ namespace MozaPlugin.Devices.Motion
             if (_connection.IsConnected) _connection.Send(frame);
         }
 
+        private void SendRunState(MotionRunState sub)
+        {
+            Send(MozaMotionProtocol.BuildRunState(sub));
+            Send(MozaMotionProtocol.BuildRunStateRead());
+        }
+
         private void ResetDeviceState()
         {
             _modeTarget = _modeCurrent = -1;
@@ -457,6 +466,11 @@ namespace MozaPlugin.Devices.Motion
             _runState = -1;
             _selfCheckPassed = false;
             _countsSeen = false;
+            _model = _hwId = _hwRev = _fw = _hw = _uid = string.Empty;
+            Volatile.Write(ref _maxStroke, float.NaN);
+            Volatile.Write(ref _hapticIntensity, float.NaN);
+            Volatile.Write(ref _rigLength, float.NaN);
+            Volatile.Write(ref _rigWidth, float.NaN);
             Interlocked.Exchange(ref _portRolesSeen, 0);
             for (int p = 0; p <= MozaMotionProtocol.PortCount; p++)
             {
@@ -471,31 +485,79 @@ namespace MozaPlugin.Devices.Motion
 
         // ------------------------------------------------------------ sequences (yield = wait ms)
 
+        // The controller answers about one request per 13 ms and drops what overflows its
+        // queue; Motion Manager re-sends unanswered reads every ~500 ms.
         private IEnumerator<int> EnrolSequence()
         {
+            var reads = new List<(byte[] Frame, Func<bool>? Answered)>();
             foreach (var probe in MozaMotionProtocol.BuildIdentityProbes())
-                Send(probe);
-            Send(MozaMotionProtocol.BuildCountsRead());
-            Send(MozaMotionProtocol.BuildModePoll());
-            Send(MozaMotionProtocol.BuildGlobalRead(MozaMotionProtocol.GlobalMaxStroke));
-            Send(MozaMotionProtocol.BuildGlobalRead(MozaMotionProtocol.GlobalHapticIntensity));
-            Send(MozaMotionProtocol.BuildRigDimensionsRead());
+                reads.Add((probe, IdentityAnswered(probe)));
+            reads.Add((MozaMotionProtocol.BuildCountsRead(), () => _countsSeen));
+            reads.Add((MozaMotionProtocol.BuildModePoll(), () => _modeCurrent >= 0));
+            reads.Add((MozaMotionProtocol.BuildRunStateRead(), () => _runState >= 0));
+            reads.Add((MozaMotionProtocol.BuildGlobalRead(MozaMotionProtocol.GlobalMaxStroke),
+                () => !float.IsNaN(Volatile.Read(ref _maxStroke))));
+            reads.Add((MozaMotionProtocol.BuildGlobalRead(MozaMotionProtocol.GlobalHapticIntensity),
+                () => !float.IsNaN(Volatile.Read(ref _hapticIntensity))));
+            reads.Add((MozaMotionProtocol.BuildRigDimensionsRead(), () => !float.IsNaN(Volatile.Read(ref _rigLength))));
             for (int p = 1; p <= MozaMotionProtocol.PortCount; p++)
             {
-                Send(MozaMotionProtocol.BuildPortStatus(p));
-                Send(MozaMotionProtocol.BuildPortRoleRead(p));
+                int port = p, bit = 1 << p;
+                reads.Add((MozaMotionProtocol.BuildPortStatus(port), () => Volatile.Read(ref _portPresent[port]) != -1));
+                reads.Add((MozaMotionProtocol.BuildPortRoleRead(port), () => (Volatile.Read(ref _portRolesSeen) & bit) != 0));
             }
-            long deadline = _clock.ElapsedMilliseconds + 3000;
-            while ((!_countsSeen || Volatile.Read(ref _portRolesSeen) != 0x1FE)
-                   && _clock.ElapsedMilliseconds < deadline)
-                yield return 20;
+
+            long deadline = _clock.ElapsedMilliseconds + EnrolTimeoutMs;
+            for (bool first = true; ; first = false)
+            {
+                foreach (var (frame, answered) in reads)
+                {
+                    if (answered == null ? !first : answered()) continue;
+                    Send(frame);
+                    yield return EnrolReadSpacingMs;
+                }
+                long retryAt = _clock.ElapsedMilliseconds + EnrolRetryMs;
+                while (!AllAnswered(reads) && _clock.ElapsedMilliseconds < retryAt)
+                    yield return 20;
+                if (AllAnswered(reads) || _clock.ElapsedMilliseconds >= deadline) break;
+            }
+            if (!AllAnswered(reads))
+            {
+                var missing = new List<string>();
+                foreach (var (frame, answered) in reads)
+                    if (answered != null && !answered()) missing.Add(BitConverter.ToString(frame).Replace("-", ""));
+                MozaLog.Debug($"[AZOM/Motion] Enrol reads unanswered: {string.Join(" ", missing)}");
+            }
 
             // MM ends its connect push with run-state stop and device type 1.
-            Send(MozaMotionProtocol.BuildRunState(MotionRunState.Stop));
+            SendRunState(MotionRunState.Stop);
             Send(MozaMotionProtocol.BuildDeviceType());
             _phase = MotionLanePhase.Ready;
             MozaLog.Info($"[AZOM/Motion] Enrolled {_model} fw {_fw}, mode {_modeCurrent}, "
                 + $"{CountPresent()} actuators");
+        }
+
+        private static bool AllAnswered(List<(byte[] Frame, Func<bool>? Answered)> reads)
+        {
+            foreach (var (_, answered) in reads)
+                if (answered != null && !answered()) return false;
+            return true;
+        }
+
+        /// <summary>Completion check for an identity probe; null = no tracked reply, sent once.</summary>
+        private Func<bool>? IdentityAnswered(byte[] probe)
+        {
+            byte arg = probe.Length > 5 ? probe[4] : (byte)0;
+            switch (probe[2])
+            {
+                case 0x04: return () => _fw.Length != 0;
+                case 0x05: return () => _hw.Length != 0;
+                case 0x06: return () => _uid.Length != 0;
+                case 0x07: return () => _model.Length != 0;
+                case 0x08 when arg == 1: return () => _hwId.Length != 0;
+                case 0x08 when arg == 2: return () => _hwRev.Length != 0;
+                default: return null;
+            }
         }
 
         private int CountPresent()
@@ -539,10 +601,10 @@ namespace MozaPlugin.Devices.Motion
                 long elapsed = _clock.ElapsedMilliseconds - start;
                 if (elapsed > GameEntryTimeoutMs) { Fault($"controller did not enter game mode (mode {_modeCurrent}{ErrorSuffix()})"); yield break; }
                 Send(MozaMotionProtocol.BuildSetMode(MotionMode.Game));
-                if (!runSent && elapsed > 300) { Send(MozaMotionProtocol.BuildRunState(MotionRunState.Run)); runSent = true; }
+                if (!runSent && elapsed > 300) { SendRunState(MotionRunState.Run); runSent = true; }
                 yield return 33;
             }
-            if (!runSent) Send(MozaMotionProtocol.BuildRunState(MotionRunState.Run));
+            if (!runSent) SendRunState(MotionRunState.Run);
             _gameLostSinceMs = -1;
             _phase = MotionLanePhase.Game;
             MozaLog.Info("[AZOM/Motion] Game mode");
@@ -552,7 +614,7 @@ namespace MozaPlugin.Devices.Motion
         {
             _phase = MotionLanePhase.Disengaging;
             _connection.ClearStreamSlots((int)StreamKind.MotionTelemetry, 1);
-            Send(MozaMotionProtocol.BuildRunState(MotionRunState.Stop));
+            SendRunState(MotionRunState.Stop);
             yield return 50;
             Send(MozaMotionProtocol.BuildSetMode(MotionMode.Standby));
             long deadline = _clock.ElapsedMilliseconds + 5000;

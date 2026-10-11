@@ -129,6 +129,7 @@ folded into [`game-stream-0x22.md`](game-stream-0x22.md) and [`effect-parameters
 | `tools/motion-decode log|streams|control|identity|registers <jsonl>` | the decoders behind every table on these pages |
 | `tools/motion-replay-correlate <jsonl> <replay-stem>` | field-by-field fit of the `0x22` stream against a SimHub replay (how the telemetry frame was identified) |
 | `tools/simhub_replay.py` | reader for SimHub session recordings (format in the module docstring) |
+| `tools/motion-displacement <jsonl>` | pairs each firmware `Output Displacement` snapshot with the last `0x22/00` frame sent; heave / tilt / warp decomposition |
 | `tools/motion-frame-check` | rebuilds every captured host frame with Python mirrors of `Protocol/MozaMotionProtocol.cs` and diffs the bytes |
 | `tools/hma150-characterize.ps1` | Windows bench script: game mode with scripted `0x22/00` inputs (gain/washout, bandwidth, heave path, gating, `0x21/02` feedback, inferred setup writes); logs `{t,dir,hex}` JSONL for `motion-decode` |
 | `tools/hma150-bridge.ps1` | the handover's SimHub→controller bridge (raw-telemetry game mode), kept for reference; formula for its SimHub custom serial device in `tools/hma150-bridge-simhub-formula.js` |
@@ -143,4 +144,5 @@ Open (also listed in [`../open-questions.md`](../open-questions.md)): telemetry 
 exact semantics of modes 3/4/5 and of the `0x20/02` 02↔03 toggles; status-record byte 1 and
 flag bit `0x04`; the `0x0E/03` notification codes; the per-port status word that appears in
 game mode; the actuator `0x27` calibration block; whether mode 2 accepts a continuous
-`0x1E/07` stream.
+`0x1E/07` stream; heave's exact source and washout in game mode; current mode 9 /
+`ErrCode:512`.

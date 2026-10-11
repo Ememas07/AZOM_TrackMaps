@@ -79,7 +79,7 @@ Polled at 2 Hz each; replies are fixed 13-byte records.
 |------|--------|---------|
 | present | `01` / `00` | actuator answers on this port |
 | slave | `06`..`09` (= low nibble of the slave id), `00` when absent | — |
-| w0..w3 | zero outside game mode; in mode 1 a changing 32-bit word — `BF C9 6A 16` (the IEEE-754 pattern of the current yaw, −1.5736) and `84 80 00 59` were seen | unknown; per-port live word during motion |
+| w0..w3 | zero outside game mode; in mode 1 a changing 32-bit word — `BF C9 6A 16` (the IEEE-754 pattern of the current yaw, −1.5736) and `84 80 00 59` were seen | unknown; stayed `00000000` through a plugin game session that sent f2 (yaw) = 0, so probably an echo of f2 rather than actuator position |
 
 The host polls only the populated ports once the map is known (`02 03`..`02 06`), all eight
 during enrol.
@@ -151,7 +151,8 @@ stop with it. The platform stays powered in standby.
 |------|------|------|
 | 259 | `error_code 259 occurs` / `err_diag_svr.c:69 Travel Not Check` | raised on entering mode 7, cleared by `selfCheckSuccess` |
 | 260 | `error_code 260 clear` | cleared 9 s after a controller power-up (actuators back) |
-| 269 | `error_code 269 occurs` / `clear` | raised at controller boot (`Controller ErrCode:8`), cleared when Motion Manager connects |
+| 269 | `error_code 269 occurs` / `clear` | raised at controller boot (`Controller ErrCode:8`), cleared when Motion Manager connects — or any host traffic: plugin 1.6.2's AB9 lane, which sent no `0x1F/03` / `0x21/01` polls, cleared it and it stayed clear |
+| `Controller ErrCode:512` | — | with current mode 9, see [`firmware-log-0x0E.md`](firmware-log-0x0E.md) |
 | `Controller ErrCode:4` | — | reported every 5 s while actuators are missing after power-up |
 
 On the cold start the controller dumped `=========== Fault Pre-Data (100 samples) ===========`

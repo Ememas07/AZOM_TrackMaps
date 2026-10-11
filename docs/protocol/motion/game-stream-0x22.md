@@ -51,6 +51,32 @@ fits give; the Spa fit of f8–f11 is poor only because the replay samples at 10
 The `100_STROKE` and Spa fits put the stream at zero lag against the replay (±50 ms search), so
 Motion Manager forwards the game's values without visible buffering.
 
+## Controller output and heave
+
+Game mode has **no heave position field**; the Heave slot (`0x1E/05 03`) and Road Detail
+(`0x1E/06`) scale what the controller derives from the frame itself. The only readback of
+what it does is the firmware log's `Output Displacement` (mm per actuator) every 60 s
+([`firmware-log-0x0E.md`](firmware-log-0x0E.md)), logged with the pitch/roll it applied.
+
+- The four displacements always satisfy `d0 + d2 = d1 + d3` (warp exactly 0): the platform is
+  driven as a plane — heave = mean, plus a pitch and a roll term.
+- The logged `pitch` / `roll` equal f0/f1 of the last frame, so attitude passes straight
+  through. A plugin session (Pitch/Roll 1.0, smoothness 0, every other slot 0) logged pitch
+  −0.032 / roll −0.020 rad → `-2.45 9.65 2.69 -9.41` mm, ≈ 6 mm per degree of pitch; Motion
+  Manager's Nürburgring session gave ≈ 200 mm/rad at Pitch 0.60.
+- Heave source, from the 12 Motion Manager game snapshots (`nurburgring-002`, `spa-003`;
+  Heave 0.30 / 0.56, Road Detail 0.70): the mean displacement fits the mean of f8–f11 minus its
+  1 s average (r = −0.80, −0.58 mm per mm) better than f6 averaged over 0.3 s (r = +0.65); raw
+  shocks, f4, f5, f7 do not fit. So heave comes mainly from common-mode suspension deflection,
+  washed out over ~1 s; too few samples to rule out an f6 term.
+- Sign: Manual Input heave −1.0 (mode 2) logged `13.35935` on all four actuators, so a
+  positive displacement is down (assuming the slider's + is up) — compression lifts the
+  platform. Same capture: Max Available Stroke 0.30.
+
+The plugin maps SimHub's pose heave onto this as a common-mode shock offset
+(`Integration/Motion/MozaHma150PoseMapping`); gain and sign await Phase 0
+(`tools/hma150-characterize.ps1`).
+
 ## `0x22/09` — haptic oscillators, 51-byte payload, ~30 Hz
 
 ```

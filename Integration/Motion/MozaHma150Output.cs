@@ -136,7 +136,7 @@ namespace MozaPlugin.Integration.Motion
             if (!CheckLane(lane)) return;
             var pose = geometryResult?.PrimaryGeometryResult?.MotionState;
             if (pose == null) return;
-            lane!.PostFrame(MozaHma150PoseMapping.ToFrame(pose.PitchDegrees, pose.RollDegrees));
+            lane!.PostFrame(MozaHma150PoseMapping.ToFrame(pose.PitchDegrees, pose.RollDegrees, pose.HeaveMm));
         }
 
         protected override void KeepAliveInternal(CompositeGeometryResult geometryResult)
