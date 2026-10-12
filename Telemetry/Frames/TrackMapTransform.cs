@@ -67,24 +67,28 @@ namespace MozaPlugin.Telemetry.Frames
         private const double BoundsFill = 0.9;
 
         /// <summary>Fit the track's map-space bounding box (SimHub's recorded map) into
-        /// the wheel's window, centred. For games without an AC map.ini.</summary>
+        /// the wheel's window, centred. For games without an AC map.ini.
+        /// <paramref name="invertZ"/> inverts the Z axis for games (like iRacing)
+        /// where SimHub integrates map coordinates with +Z pointing South, matching
+        /// the wheel's +Z North frame to prevent left/right track mirroring.</summary>
         public static TrackMapTransform FromBounds(double minX, double maxX, double minY, double maxY,
-            double minZ, double maxZ)
+            double minZ, double maxZ, bool invertZ = false)
         {
             double ext = Math.Max(maxX - minX, maxZ - minZ);
             double s = BoundsFill * FieldX / ext;
             // Elevation shares S unless the track's height range overflows the 16-bit
             // field (Bathurst: 191 m × 442/m), which would clamp the low end to 0.
             double sy = maxY - minY > 0.0 ? Math.Min(s, BoundsFill * FieldY / (maxY - minY)) : s;
+            double sz = invertZ ? -16.0 * s : 16.0 * s;
             return new TrackMapTransform
             {
                 ScaleX = (float)s,
-                ScaleZ = (float)(16.0 * s),
+                ScaleZ = (float)sz,
                 ScaleY = (float)sy,
                 CenterX = (int)Math.Round(BoundsCenterX - s * (minX + maxX) / 2.0),
-                CenterZ = (int)Math.Round(BoundsCenterZ - 16.0 * s * (minZ + maxZ) / 2.0),
+                CenterZ = (int)Math.Round(BoundsCenterZ - sz * (minZ + maxZ) / 2.0),
                 CenterY = (int)Math.Round(CenterYConst - sy * (minY + maxY) / 2.0),
-                Source = $"bounds:{(int)(maxX - minX)}x{(int)(maxZ - minZ)}m",
+                Source = $"bounds:{(int)(maxX - minX)}x{(int)(maxZ - minZ)}m{(invertZ ? ":invZ" : "")}",
             };
         }
 

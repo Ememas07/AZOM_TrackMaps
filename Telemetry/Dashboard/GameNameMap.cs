@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using MozaPlugin.Diagnostics;
 
 namespace MozaPlugin.Telemetry.Dashboard
 {
@@ -44,11 +46,120 @@ namespace MozaPlugin.Telemetry.Dashboard
         // MOZA short code from the same ToMoza dictionary used by Resolve
         // (AC → "ac", ACC → "acc"); only AC is capture-verified. Unknown games
         // fall through to the bare track name (no worse than before the prefix).
-        internal static string TrackPath(string? simHubGameName, string? trackName)
+        // For games with distinct track layouts/configs (e.g. iRacing Nürburgring
+        // GP vs Nordschleife vs Combined, or Indianapolis Road vs Oval), matches
+        // against PitHouse's bundled .mztrack names so the wheel displays the
+        // correct track circuit map.
+        internal static string TrackPath(string? simHubGameName, string? trackName, string? trackConfig = null, string? trackCode = null)
         {
-            if (string.IsNullOrEmpty(trackName)) return "";
+            if (string.IsNullOrEmpty(trackName) && string.IsNullOrEmpty(trackCode)) return "";
             string prefix = Resolve(simHubGameName).ToLowerInvariant();
-            return prefix.Length == 0 ? trackName! : prefix + "/" + trackName;
+            string resolvedTrack = ResolveTrackNameForWheel(prefix, trackName, trackConfig, trackCode);
+            return prefix.Length == 0 ? resolvedTrack : prefix + "/" + resolvedTrack;
+        }
+
+        private static readonly object s_trackDataLock = new object();
+        private static readonly Dictionary<string, Dictionary<string, string>> s_gameTracksCased
+            = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+
+        private static string ResolveTrackNameForWheel(string gamePrefix, string? trackName, string? trackConfig, string? trackCode)
+        {
+            EnsureTrackDataLoaded(gamePrefix);
+
+            string t = (trackName ?? "").Trim();
+            string cfg = (trackConfig ?? "").Trim();
+            string code = (trackCode ?? "").Trim();
+
+            if (s_gameTracksCased.TryGetValue(gamePrefix, out var tracksMap) && tracksMap.Count > 0)
+            {
+                // Try candidate matches in priority order
+                var candidates = new List<string>();
+                if (!string.IsNullOrEmpty(t) && !string.IsNullOrEmpty(cfg))
+                {
+                    candidates.Add($"{t} {cfg}");
+                    candidates.Add($"{t}{cfg}");
+                }
+                if (!string.IsNullOrEmpty(code))
+                    candidates.Add(code);
+                if (!string.IsNullOrEmpty(t))
+                    candidates.Add(t);
+
+                foreach (var cand in candidates)
+                {
+                    string candClean = cand.ToLowerInvariant();
+                    if (tracksMap.TryGetValue(candClean, out var match))
+                        return match;
+                }
+
+                // If no exact match, try prefix / substring match
+                if (!string.IsNullOrEmpty(t))
+                {
+                    string tLower = t.ToLowerInvariant();
+                    string cfgLower = cfg.ToLowerInvariant();
+                    foreach (var kv in tracksMap)
+                    {
+                        if (kv.Key.StartsWith(tLower, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (!string.IsNullOrEmpty(cfgLower) && kv.Key.Contains(cfgLower))
+                                return kv.Value;
+                        }
+                    }
+                    foreach (var kv in tracksMap)
+                    {
+                        if (kv.Key.StartsWith(tLower, StringComparison.OrdinalIgnoreCase))
+                            return kv.Value;
+                    }
+                }
+            }
+
+            // Fallback when PitHouse TrackData not available on disk or uncatalogued
+            if (!string.IsNullOrEmpty(t) && !string.IsNullOrEmpty(cfg)
+                && !t.EndsWith(cfg, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{t} {cfg}";
+            }
+            return !string.IsNullOrEmpty(t) ? t : code;
+        }
+
+        private static void EnsureTrackDataLoaded(string gamePrefix)
+        {
+            if (s_gameTracksCased.ContainsKey(gamePrefix)) return;
+            lock (s_trackDataLock)
+            {
+                if (s_gameTracksCased.ContainsKey(gamePrefix)) return;
+                var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                string[] searchRoots = new[]
+                {
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "MOZA Pit House", "bin", "GameConfigs", "TrackData"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "MOZA Pit House", "bin", "GameConfigs", "TrackData"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "pithouse2", "bin", "GameConfigs", "TrackData"),
+                };
+
+                foreach (var root in searchRoots)
+                {
+                    string dir = Path.Combine(root, gamePrefix);
+                    if (Directory.Exists(dir))
+                    {
+                        try
+                        {
+                            foreach (var f in Directory.GetFiles(dir, "*.mztrack"))
+                            {
+                                string baseName = Path.GetFileNameWithoutExtension(f);
+                                map[baseName.ToLowerInvariant()] = baseName;
+                            }
+                            if (map.Count > 0)
+                            {
+                                MozaLog.Info($"[AZOM] loaded {map.Count} wheel track names for '{gamePrefix}' from '{dir}'");
+                                break;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
+                s_gameTracksCased[gamePrefix] = map;
+            }
         }
     }
 }

@@ -349,10 +349,11 @@ namespace MozaPlugin.Telemetry.Frames
             if (_mapTransformBounds == b) return;
             _mapTransformBounds = b;
             _mapTransform = TrackMapTransform.FromBounds(
-                snap.MapMinX, snap.MapMaxX, snap.MapMinY, snap.MapMaxY, snap.MapMinZ, snap.MapMaxZ);
+                snap.MapMinX, snap.MapMaxX, snap.MapMinY, snap.MapMaxY, snap.MapMinZ, snap.MapMaxZ,
+                snap.IsLapRelativeCoordinates);
             MozaLog.Info($"[AZOM] track transform '{snap.TrackFolderName}': {_mapTransform.Source} " +
                 $"-> X_scale={_mapTransform.ScaleX:F1} X_center={_mapTransform.CenterX} " +
-                $"Z_center={_mapTransform.CenterZ} Y_center={_mapTransform.CenterY}");
+                $"Z_scale={_mapTransform.ScaleZ:F0} Z_center={_mapTransform.CenterZ} Y_center={_mapTransform.CenterY}");
         }
 
         private static int Round(float v) => (int)Math.Round((double)v);

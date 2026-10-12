@@ -21,6 +21,7 @@ namespace MozaPlugin.Telemetry
         private readonly NCalcExpressionEvaluator _formula = new NCalcExpressionEvaluator();
         private bool _allPropertiesNamesWarned;
         private static bool s_trackNameLogged;
+        private static string? s_lastTrackResult;
 
         public SimHubPropertyResolver(PluginManager pluginManager, MozaData data, MozaHidReader hidReader)
         {
@@ -169,20 +170,24 @@ namespace MozaPlugin.Telemetry
                 case "@internal/TrackName":
                 {
                     // The wheel's track-map MAP KEY "<gameprefix>/<track>"
-                    // (e.g. "ac/imola"), not a display string — without the
-                    // game prefix the wheel can't locate the map and the
-                    // track-map widget renders blank.
-                    string? game = null; object? track = null, propGame = null;
+                    // (e.g. "ac/imola", "iracing/bathurst", "iracing/nurburgring combinedShortB"),
+                    // not a display string — without the game prefix and layout key the
+                    // wheel can't locate the map and renders blank or off-track.
+                    string? game = null; object? track = null, config = null, code = null, propGame = null;
                     try { game = _pluginManager?.GameName; } catch { }
                     try { propGame = _pluginManager?.GetPropertyValue("DataCorePlugin.GameName"); } catch { }
                     try { track = _pluginManager?.GetPropertyValue("DataCorePlugin.GameData.TrackName"); }
                     catch { /* unresolvable → empty track name */ }
-                    string result = Dashboard.GameNameMap.TrackPath(game, track?.ToString());
-                    if (!s_trackNameLogged)
+                    try { config = _pluginManager?.GetPropertyValue("DataCorePlugin.GameData.TrackConfig"); } catch { }
+                    try { code = _pluginManager?.GetPropertyValue("DataCorePlugin.GameData.TrackCode"); } catch { }
+                    string result = Dashboard.GameNameMap.TrackPath(game, track?.ToString(), config?.ToString(), code?.ToString());
+                    if (!s_trackNameLogged || result != s_lastTrackResult)
                     {
                         s_trackNameLogged = true;
+                        s_lastTrackResult = result;
                         MozaLog.Info($"[AZOM] @internal/TrackName resolve: GameName={game ?? "<null>"} " +
-                            $"prop.GameName={propGame ?? "<null>"} TrackName={track ?? "<null>"} -> '{result}'");
+                            $"prop.GameName={propGame ?? "<null>"} TrackName={track ?? "<null>"} " +
+                            $"TrackConfig={config ?? "<null>"} TrackCode={code ?? "<null>"} -> '{result}'");
                     }
                     return result;
                 }

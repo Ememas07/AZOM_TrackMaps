@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using GameReaderCommon;
 using MozaPlugin.Diagnostics;
@@ -66,6 +68,11 @@ namespace MozaPlugin.Telemetry.Frames
         // for tracks without an AC map.ini. Invalid until SimHub has a map.
         public bool MapBoundsValid;
         public double MapMinX, MapMaxX, MapMinY, MapMaxY, MapMinZ, MapMaxZ;
+
+        // True when the game reports coordinates as lap-distance-relative rather
+        // than absolute world coordinates (iRacing). Recorded maps for these games
+        // have their Z axis inverted relative to the wheel's world space.
+        public bool IsLapRelativeCoordinates;
 
         // Per-car position RELATIVE to the player (already rotated into the
         // player's frame by SimHub), for the radar (patch/ri*) channels. Each
@@ -140,6 +147,7 @@ namespace MozaPlugin.Telemetry.Frames
                 }
                 snap.TrackFolderName = s_carPosCache.TrackFolderName;
                 snap.MapBoundsValid  = s_carPosCache.MapBoundsValid;
+                snap.IsLapRelativeCoordinates = s_carPosCache.IsLapRelativeCoordinates;
                 snap.MapMinX = s_carPosCache.MapMinX; snap.MapMaxX = s_carPosCache.MapMaxX;
                 snap.MapMinY = s_carPosCache.MapMinY; snap.MapMaxY = s_carPosCache.MapMaxY;
                 snap.MapMinZ = s_carPosCache.MapMinZ; snap.MapMaxZ = s_carPosCache.MapMaxZ;
@@ -206,12 +214,17 @@ namespace MozaPlugin.Telemetry.Frames
             // lap-relative coordinates to world space for games that report them
             // (iRacing); a passthrough for world-coord games (AC/AMS2) and null
             // until a lap has been recorded. Read reflectively to avoid a hard
-            // SimHub.Plugins compile-time dependency.
-            var map = TryGetMapRecord();
+            // SimHub.Plugins compile-time dependency, with a disk fallback to
+            // SimHub's MapRecords/MapRecordsCloud when GetMap() is absent or corrupt.
+            string? gameName = TryResolveGameName(data);
+            var map = TryGetMapRecord(data, gameName);
+
+            bool isLapRelative = IsLapRelativeCoordinatesGame(data, map, gameName);
+            snap.IsLapRelativeCoordinates = isLapRelative;
 
             // iRacing reports every car as [LapDistPct, 0, 0]; only a recorded map
             // turns that into a position. Without one there is nothing to plot.
-            if (map == null && data.RelativeCarCoordinates != null)
+            if (map == null && isLapRelative)
                 return;
 
             var bounds = GetMapBounds(map);
@@ -468,16 +481,56 @@ namespace MozaPlugin.Telemetry.Frames
             }
         }
 
-        // Cached MethodInfo for SimHub.Plugins
-        // PersistantTrackerPlugin.GetMap() — the public static accessor for the
-        // recorded track map. Reflected (not a compile-time call) so a SimHub
-        // build that moves or renames it degrades to null instead of throwing.
+        // Cached reflection info for SimHub.Plugins PersistantTrackerPlugin.
         private static MethodInfo? s_getMapMethod;
+        private static PropertyInfo? s_getOnlineMapProp;
         private static bool s_getMapResolved;
+        private static Type? s_dataRecordType;
+        private static bool s_dataRecordTypeResolved;
+        private static DataRecordBase? s_diskMap;
+        private static string? s_diskMapKey;
+
+        private static string? TryResolveGameName(StatusDataBase data)
+        {
+            try
+            {
+                string? gn = SimHub.Plugins.PluginManager.GetInstance()?.GameName;
+                if (!string.IsNullOrEmpty(gn)) return gn;
+            }
+            catch { }
+            try
+            {
+                object? raw = data.GetRawDataObject();
+                if (raw != null)
+                {
+                    string typeName = raw.GetType().FullName ?? "";
+                    if (typeName.IndexOf("iracing", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return "IRacing";
+                    if (typeName.IndexOf("assettocorsa", StringComparison.OrdinalIgnoreCase) >= 0)
+                        return "AssettoCorsa";
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        private static bool IsLapRelativeCoordinatesGame(StatusDataBase data, DataRecordBase? map, string? gameName)
+        {
+            if (map != null && map.HasRelativeCarCoordinates)
+                return true;
+            if (string.Equals(gameName, "IRacing", StringComparison.OrdinalIgnoreCase))
+                return true;
+            object? raw = data.GetRawDataObject();
+            if (raw != null && (raw.GetType().FullName ?? "").IndexOf("iracing", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+            return false;
+        }
 
         // The live recorded track-map record, or null when none exists yet or
-        // SimHub's internals have shifted.
-        private static DataRecordBase? TryGetMapRecord()
+        // SimHub's internals have shifted. When SimHub's in-memory record is
+        // null or corrupted (<20 points), falls back to scanning MapRecordsCloud
+        // and MapRecords on disk.
+        private static DataRecordBase? TryGetMapRecord(StatusDataBase data, string? gameName)
         {
             try
             {
@@ -488,13 +541,132 @@ namespace MozaPlugin.Telemetry.Frames
                         "SimHub.Plugins.DataPlugins.PersistantTracker.PersistantTrackerPlugin, SimHub.Plugins");
                     s_getMapMethod = t?.GetMethod("GetMap",
                         BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
+                    s_getOnlineMapProp = t?.GetProperty("OnlineMapRecord",
+                        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
                 }
-                return s_getMapMethod?.Invoke(null, null) as DataRecordBase;
+
+                var map = s_getMapMethod?.Invoke(null, null) as DataRecordBase;
+                if (map != null && map.CarCoordinates != null && map.CarCoordinates.Count >= 20)
+                    return map;
+
+                map = s_getOnlineMapProp?.GetValue(null) as DataRecordBase;
+                if (map != null && map.CarCoordinates != null && map.CarCoordinates.Count >= 20)
+                    return map;
+
+                return TryLoadMapRecordFromDisk(data, gameName);
             }
             catch
             {
                 return null;
             }
+        }
+
+        private static DataRecordBase? TryLoadMapRecordFromDisk(StatusDataBase data, string? gameName)
+        {
+            try
+            {
+                string? trackName = data.TrackName;
+                string? trackCode = data.TrackCode;
+                string? trackConfig = data.TrackConfig;
+                if (string.IsNullOrEmpty(gameName) || (string.IsNullOrEmpty(trackName) && string.IsNullOrEmpty(trackCode)))
+                    return null;
+
+                string key = $"{gameName}:{trackName}:{trackCode}:{trackConfig}";
+                if (s_diskMapKey == key)
+                    return s_diskMap;
+
+                s_diskMapKey = key;
+                s_diskMap = null;
+
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                var searchDirs = new[]
+                {
+                    Path.Combine(baseDir, "PluginsData", gameName!, "MapRecordsCloud"),
+                    Path.Combine(baseDir, "PluginsData", gameName!, "MapRecords"),
+                };
+
+                string cleanTrack = (trackName ?? "").ToLowerInvariant().Replace(" ", "").Replace("-", "");
+                string cleanCode = (trackCode ?? "").ToLowerInvariant().Replace(" ", "").Replace("-", "");
+                string cleanConfig = (trackConfig ?? "").ToLowerInvariant().Replace(" ", "").Replace("-", "");
+
+                var candidates = new List<(int score, string path)>();
+
+                foreach (var dir in searchDirs)
+                {
+                    if (!Directory.Exists(dir)) continue;
+                    foreach (var file in Directory.GetFiles(dir, "*.shtl"))
+                    {
+                        string fn = Path.GetFileNameWithoutExtension(file).ToLowerInvariant().Replace(" ", "").Replace("-", "");
+                        int score = 0;
+                        if (!string.IsNullOrEmpty(cleanTrack) && fn.Contains(cleanTrack))
+                            score += 10;
+                        if (!string.IsNullOrEmpty(cleanCode) && fn.Contains(cleanCode))
+                            score += 10;
+                        if (score > 0)
+                        {
+                            if (!string.IsNullOrEmpty(cleanConfig) && fn.Contains(cleanConfig))
+                                score += 5;
+                            // Prefer cloud records when local records may be aborted/corrupted laps
+                            if (dir.EndsWith("MapRecordsCloud", StringComparison.OrdinalIgnoreCase))
+                                score += 2;
+                            candidates.Add((score, file));
+                        }
+                    }
+                }
+
+                candidates.Sort((a, b) => b.score.CompareTo(a.score));
+
+                bool isLapRelative = string.Equals(gameName, "IRacing", StringComparison.OrdinalIgnoreCase);
+
+                foreach (var candidate in candidates)
+                {
+                    var rec = LoadShtlFile(candidate.path, isLapRelative);
+                    if (rec != null)
+                    {
+                        MozaLog.Info($"[AZOM] loaded fallback track map from disk: '{candidate.path}' ({rec.CarCoordinates?.Count ?? 0} pts)");
+                        s_diskMap = rec;
+                        return rec;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MozaLog.Info($"[AZOM] TryLoadMapRecordFromDisk failed: {ex.Message}");
+            }
+            return null;
+        }
+
+        private static DataRecordBase? LoadShtlFile(string path, bool isLapRelative)
+        {
+            try
+            {
+                if (!File.Exists(path)) return null;
+                using (var fs = File.OpenRead(path))
+                using (var gz = new GZipStream(fs, CompressionMode.Decompress))
+                using (var sr = new StreamReader(gz))
+                {
+                    string json = sr.ReadToEnd();
+                    if (!s_dataRecordTypeResolved)
+                    {
+                        s_dataRecordTypeResolved = true;
+                        s_dataRecordType = Type.GetType(
+                            "SimHub.Plugins.DataPlugins.PersistantTracker.DataRecord, SimHub.Plugins");
+                    }
+                    if (s_dataRecordType == null) return null;
+                    var rec = Newtonsoft.Json.JsonConvert.DeserializeObject(json, s_dataRecordType) as DataRecordBase;
+                    if (rec != null && rec.CarCoordinates != null && rec.CarCoordinates.Count >= 20)
+                    {
+                        if (isLapRelative)
+                            rec.HasRelativeCarCoordinates = true;
+                        return rec;
+                    }
+                }
+            }
+            catch
+            {
+                // Try next candidate on parse error
+            }
+            return null;
         }
 
         // ── Track bounding box (from SimHub's recorded map) ───────────────────
