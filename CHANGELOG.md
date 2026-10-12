@@ -26,6 +26,9 @@ All notable changes to the AZOM plugin are documented here.
 - **Track-map dots line up in iRacing and other non-AC games.** The map is fitted to SimHub's
   recorded track instead of a fixed scale that clipped larger tracks.
 
+- **Changing an mBooster pedal's role swaps it with the pedal that had that role.** Two pedals
+  no longer end up on the same role.
+
 - **The mBooster output curve is set on the pedal correctly.** Its start and end points set
   the pedal's range, and the four points between stay evenly spaced.
 
