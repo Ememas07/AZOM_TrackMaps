@@ -589,6 +589,11 @@ namespace MozaPlugin.Telemetry.Frames
                 string cleanCode = (trackCode ?? "").ToLowerInvariant().Replace(" ", "").Replace("-", "");
                 string cleanConfig = (trackConfig ?? "").ToLowerInvariant().Replace(" ", "").Replace("-", "");
 
+                // Resolve canonical track name from GameNameMap so aliases (e.g. nordschleife -> nurburgring combinedshortb) match disk .shtl files
+                string resolvedTrack = Dashboard.GameNameMap.ResolveTrackNameForWheel(
+                    gameName!.ToLowerInvariant(), trackName, trackConfig, trackCode);
+                string cleanResolved = (resolvedTrack ?? "").ToLowerInvariant().Replace(" ", "").Replace("-", "");
+
                 var candidates = new List<(int score, string path)>();
 
                 foreach (var dir in searchDirs)
@@ -598,6 +603,8 @@ namespace MozaPlugin.Telemetry.Frames
                     {
                         string fn = Path.GetFileNameWithoutExtension(file).ToLowerInvariant().Replace(" ", "").Replace("-", "");
                         int score = 0;
+                        if (!string.IsNullOrEmpty(cleanResolved) && fn.Contains(cleanResolved))
+                            score += 25;
                         if (!string.IsNullOrEmpty(cleanTrack) && fn.Contains(cleanTrack))
                             score += 10;
                         if (!string.IsNullOrEmpty(cleanCode) && fn.Contains(cleanCode))

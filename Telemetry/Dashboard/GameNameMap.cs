@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using MozaPlugin.Diagnostics;
 
 namespace MozaPlugin.Telemetry.Dashboard
@@ -50,11 +51,13 @@ namespace MozaPlugin.Telemetry.Dashboard
         // GP vs Nordschleife vs Combined, or Indianapolis Road vs Oval), matches
         // against PitHouse's bundled .mztrack names so the wheel displays the
         // correct track circuit map.
+        // Always lowercased because the wheel firmware runs embedded Linux
+        // (aarch64) where /home/moza/resource/maps/ has case-sensitive lowercase files.
         internal static string TrackPath(string? simHubGameName, string? trackName, string? trackConfig = null, string? trackCode = null)
         {
             if (string.IsNullOrEmpty(trackName) && string.IsNullOrEmpty(trackCode)) return "";
             string prefix = Resolve(simHubGameName).ToLowerInvariant();
-            string resolvedTrack = ResolveTrackNameForWheel(prefix, trackName, trackConfig, trackCode);
+            string resolvedTrack = ResolveTrackNameForWheel(prefix, trackName, trackConfig, trackCode).ToLowerInvariant();
             return prefix.Length == 0 ? resolvedTrack : prefix + "/" + resolvedTrack;
         }
 
@@ -62,7 +65,30 @@ namespace MozaPlugin.Telemetry.Dashboard
         private static readonly Dictionary<string, Dictionary<string, string>> s_gameTracksCased
             = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
 
-        private static string ResolveTrackNameForWheel(string gamePrefix, string? trackName, string? trackConfig, string? trackCode)
+        private static readonly (string Alias, string Canonical)[] TrackSynonyms = new[]
+        {
+            ("nordschleife", "nurburgring"),
+            ("nords", "nurburgring"),
+            ("redbullring", "spielberg"),
+            ("mountpanorama", "bathurst"),
+            ("weathertech", "lagunaseca"),
+            ("circuitoftheamericas", "cota"),
+            ("josecarlospace", "interlagos"),
+        };
+
+        internal static string Clean(string? s)
+        {
+            if (string.IsNullOrWhiteSpace(s) || s == null) return "";
+            var sb = new StringBuilder(s.Length);
+            foreach (char c in s)
+            {
+                if (char.IsLetterOrDigit(c))
+                    sb.Append(char.ToLowerInvariant(c));
+            }
+            return sb.ToString();
+        }
+
+        internal static string ResolveTrackNameForWheel(string gamePrefix, string? trackName, string? trackConfig, string? trackCode)
         {
             EnsureTrackDataLoaded(gamePrefix);
 
@@ -72,53 +98,150 @@ namespace MozaPlugin.Telemetry.Dashboard
 
             if (s_gameTracksCased.TryGetValue(gamePrefix, out var tracksMap) && tracksMap.Count > 0)
             {
-                // Try candidate matches in priority order
+                // Generate candidates in priority order
                 var candidates = new List<string>();
+
+                // Special handling for Nürburgring / Nordschleife layout variants
+                string combinedSearch = $"{t} {cfg} {code}".ToLowerInvariant();
+                if (combinedSearch.Contains("nords") || combinedSearch.Contains("nurburg"))
+                {
+                    if (combinedSearch.Contains("tourist"))
+                        candidates.Add("nurburgring nordschleifetourist");
+                    if (combinedSearch.Contains("shortb") || combinedSearch.Contains("short b"))
+                        candidates.Add("nurburgring combinedshortb");
+                    if (combinedSearch.Contains("shorta") || combinedSearch.Contains("short a"))
+                        candidates.Add("nurburgring combinedshorta");
+                    if (combinedSearch.Contains("long"))
+                        candidates.Add("nurburgring combinedlong");
+                    if (combinedSearch.Contains("combined"))
+                        candidates.Add("nurburgring combined");
+                    if (combinedSearch.Contains("nords") && !combinedSearch.Contains("combined") && !combinedSearch.Contains("short") && !combinedSearch.Contains("long"))
+                        candidates.Add("nurburgring nordschleife");
+                }
+
                 if (!string.IsNullOrEmpty(t) && !string.IsNullOrEmpty(cfg))
                 {
                     candidates.Add($"{t} {cfg}");
                     candidates.Add($"{t}{cfg}");
                 }
                 if (!string.IsNullOrEmpty(code))
+                {
                     candidates.Add(code);
+                    candidates.Add(code.Replace("-", " ").Replace("_", " "));
+                }
                 if (!string.IsNullOrEmpty(t))
+                {
                     candidates.Add(t);
+                    candidates.Add(t.Replace("-", " ").Replace("_", " "));
+                }
 
+                // Add synonym-expanded versions of candidates
+                int count = candidates.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    string candLower = candidates[i].ToLowerInvariant();
+                    foreach (var syn in TrackSynonyms)
+                    {
+                        if (candLower.Contains(syn.Alias))
+                        {
+                            candidates.Add(candLower.Replace(syn.Alias, syn.Canonical));
+                        }
+                    }
+                }
+
+                // 1. Exact clean match (alphanumerics only)
                 foreach (var cand in candidates)
                 {
-                    string candClean = cand.ToLowerInvariant();
+                    string candClean = Clean(cand);
+                    if (string.IsNullOrEmpty(candClean)) continue;
                     if (tracksMap.TryGetValue(candClean, out var match))
                         return match;
                 }
 
-                // If no exact match, try prefix / substring match
-                if (!string.IsNullOrEmpty(t))
+                // 2. Token-based overlap match against known PitHouse tracks
+                string bestMatch = "";
+                int bestScore = 0;
+                var queryTokens = ExtractTokens(combinedSearch);
+
+                foreach (var kv in tracksMap)
                 {
-                    string tLower = t.ToLowerInvariant();
-                    string cfgLower = cfg.ToLowerInvariant();
-                    foreach (var kv in tracksMap)
+                    string trackClean = kv.Key; // already Clean
+                    string trackVal = kv.Value;
+
+                    int score = 0;
+                    bool hasBaseMatch = false;
+
+                    // Base track match check
+                    foreach (var syn in TrackSynonyms)
                     {
-                        if (kv.Key.StartsWith(tLower, StringComparison.OrdinalIgnoreCase))
+                        if (queryTokens.Contains(syn.Alias) && trackClean.Contains(syn.Canonical))
+                            hasBaseMatch = true;
+                    }
+
+                    foreach (var token in queryTokens)
+                    {
+                        if (trackClean.Contains(token))
                         {
-                            if (!string.IsNullOrEmpty(cfgLower) && kv.Key.Contains(cfgLower))
-                                return kv.Value;
+                            hasBaseMatch = true;
+                            score += (token.Length > 2) ? 10 : 5;
                         }
                     }
-                    foreach (var kv in tracksMap)
+
+                    if (hasBaseMatch && score > bestScore)
                     {
-                        if (kv.Key.StartsWith(tLower, StringComparison.OrdinalIgnoreCase))
-                            return kv.Value;
+                        bestScore = score;
+                        bestMatch = trackVal;
                     }
                 }
+
+                if (!string.IsNullOrEmpty(bestMatch))
+                    return bestMatch;
             }
 
             // Fallback when PitHouse TrackData not available on disk or uncatalogued
+            string fallback = "";
             if (!string.IsNullOrEmpty(t) && !string.IsNullOrEmpty(cfg)
                 && !t.EndsWith(cfg, StringComparison.OrdinalIgnoreCase))
             {
-                return $"{t} {cfg}";
+                fallback = $"{t} {cfg}";
             }
-            return !string.IsNullOrEmpty(t) ? t : code;
+            else
+            {
+                fallback = !string.IsNullOrEmpty(t) ? t : code;
+            }
+
+            // Apply synonyms to fallback as well
+            string fbLower = fallback.ToLowerInvariant();
+            foreach (var syn in TrackSynonyms)
+            {
+                if (fbLower.Contains(syn.Alias))
+                    fbLower = fbLower.Replace(syn.Alias, syn.Canonical);
+            }
+            return fbLower;
+        }
+
+        private static HashSet<string> ExtractTokens(string s)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var sb = new StringBuilder();
+            foreach (char c in s)
+            {
+                if (char.IsLetterOrDigit(c))
+                {
+                    sb.Append(char.ToLowerInvariant(c));
+                }
+                else
+                {
+                    if (sb.Length > 0)
+                    {
+                        set.Add(sb.ToString());
+                        sb.Clear();
+                    }
+                }
+            }
+            if (sb.Length > 0)
+                set.Add(sb.ToString());
+            return set;
         }
 
         private static void EnsureTrackDataLoaded(string gamePrefix)
@@ -131,9 +254,10 @@ namespace MozaPlugin.Telemetry.Dashboard
 
                 string[] searchRoots = new[]
                 {
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "pithouse2", "bin", "GameConfigs", "TrackData"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "pithouse2", "bin", "GameConfigs", "TrackData"),
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "MOZA Pit House", "bin", "GameConfigs", "TrackData"),
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "MOZA Pit House", "bin", "GameConfigs", "TrackData"),
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "pithouse2", "bin", "GameConfigs", "TrackData"),
                 };
 
                 foreach (var root in searchRoots)
@@ -146,16 +270,20 @@ namespace MozaPlugin.Telemetry.Dashboard
                             foreach (var f in Directory.GetFiles(dir, "*.mztrack"))
                             {
                                 string baseName = Path.GetFileNameWithoutExtension(f);
-                                map[baseName.ToLowerInvariant()] = baseName;
-                            }
-                            if (map.Count > 0)
-                            {
-                                MozaLog.Info($"[AZOM] loaded {map.Count} wheel track names for '{gamePrefix}' from '{dir}'");
-                                break;
+                                string clean = Clean(baseName);
+                                if (!string.IsNullOrEmpty(clean) && !map.ContainsKey(clean))
+                                {
+                                    map[clean] = baseName.ToLowerInvariant();
+                                }
                             }
                         }
                         catch { }
                     }
+                }
+
+                if (map.Count > 0)
+                {
+                    MozaLog.Info($"[AZOM] loaded {map.Count} wheel track names for '{gamePrefix}'");
                 }
 
                 s_gameTracksCased[gamePrefix] = map;
